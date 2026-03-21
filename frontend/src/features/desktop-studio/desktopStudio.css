@@ -1,0 +1,67 @@
+/* Desktop Studio */
+
+.desktop-studio-screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  height: 100vh;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.panel-frame,
+.summary-card,
+.loading-panel {
+  position: relative;
+  z-index: 1;
+  background: rgba(28, 29, 31, 0.96);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: none;
+}
+
+
+.desktop-studio-shell {
+  min-height: 0;
+  height: 100%;
+  padding: 10px;
+}
+
+.desktop-studio-shell.is-spot-studio {
+  grid-template-columns: 264px minmax(0, 1fr) 320px;
+}
+
+.studio-library-panel,
+.studio-browser-panel,
+.studio-inspector-panel {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-panel);
+}
+
+.studio-library-panel,
+.studio-browser-panel {
+  overflow: auto;
+}
+
+.studio-library-panel {
+  background: var(--bg-panel-strong);
+}
+
+.desktop-studio-shell.is-spot-studio .studio-library-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 6px;
+  overflow: hidden;
+}
+
+.desktop-studio-shell.is-spot-studio .studio-library-panel,
+.desktop-studio-shell.is-spot-studio .studio-browser-panel,
+.desktop-studio-shell.is-spot-studio .studio-inspector-panel {
+  padding: 8px;
+}
+

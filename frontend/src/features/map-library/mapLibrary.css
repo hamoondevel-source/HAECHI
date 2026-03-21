@@ -1,0 +1,47 @@
+.map-library-tree-panel {
+  padding: 10px 8px;
+}
+
+.map-library-tree-scroll {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-height: 0;
+}
+
+.map-library-tree-panel .unity-tree-children {
+  gap: 1px;
+}
+
+.map-library-tree-panel .unity-tree-line {
+  padding-right: 2px;
+}
+
+.map-library-tree-panel .unity-tree-item {
+  min-height: 20px;
+  padding-right: 2px;
+}
+
+.map-library-tree-panel .unity-tree-meta {
+  gap: 6px;
+}
+
+.map-library-tree-meta-note {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.map-library-tree-panel .folder-node-kind {
+  min-width: 42px;
+  height: 15px;
+  padding: 0 5px;
+  font-size: 0.53rem;
+}
+
+.map-library-tree-panel .unity-tree-empty {
+  padding-left: 34px;
+}

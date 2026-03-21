@@ -1,0 +1,45 @@
+:root {
+  font-family: "Pretendard Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic",
+    "Segoe UI", sans-serif;
+  color: #ebe7df;
+  color-scheme: dark;
+
+  --font-kr: "Pretendard Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic",
+    "Segoe UI", sans-serif;
+  --font-en: "IBM Plex Sans", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Consolas", "Liberation Mono", monospace;
+
+  --bg-app: #111213;
+  --bg-surface: #17181b;
+  --bg-panel: #1d1f23;
+  --bg-panel-strong: #24272c;
+
+  --line-soft: rgba(232, 228, 219, 0.08);
+  --line-default: rgba(232, 228, 219, 0.14);
+  --line-strong: rgba(238, 234, 226, 0.28);
+
+  --text-primary: #ece7dd;
+  --text-secondary: #b4ada2;
+  --text-tertiary: #8b857c;
+
+  --accent: #d6d1c7;
+  --accent-soft: #c3b9ad;
+
+  --state-success: #d8d3ca;
+  --state-warning: #d0c8bb;
+  --state-danger: #e0c5c1;
+  --state-muted: #7f7a73;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --shadow-panel: 0 10px 24px rgba(0, 0, 0, 0.2);
+}

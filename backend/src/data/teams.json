@@ -1,0 +1,14 @@
+[
+  {
+    "id": "team-alpha",
+    "name": "A 운영팀",
+    "code": "ALPHA",
+    "node": { "x": 120, "y": 110 }
+  },
+  {
+    "id": "team-bravo",
+    "name": "B 운영팀",
+    "code": "BRAVO",
+    "node": { "x": 120, "y": 300 }
+  }
+]

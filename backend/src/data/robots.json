@@ -1,0 +1,74 @@
+[
+  {
+    "id": "HX-01",
+    "name": "Haechi Alpha",
+    "status": "active",
+    "battery": 86,
+    "mission": "Warehouse Patrol",
+    "location": "Sector A1",
+    "speed": "1.2 m/s",
+    "temperature": "41 C",
+    "mapPose": {
+      "domainId": "domain-seoul-factory",
+      "deckId": "deck-1f",
+      "spotId": "spot-a1",
+      "x": 3.1,
+      "y": 19.4,
+      "heading": 18
+    }
+  },
+  {
+    "id": "HX-02",
+    "name": "Haechi Beta",
+    "status": "charging",
+    "battery": 29,
+    "mission": "Dock Recharge",
+    "location": "Charge Bay 2",
+    "speed": "0.0 m/s",
+    "temperature": "36 C",
+    "mapPose": {
+      "domainId": "domain-seoul-factory",
+      "deckId": "deck-1f",
+      "spotId": "spot-charge-b2",
+      "x": 22.9,
+      "y": 5.1,
+      "heading": 0
+    }
+  },
+  {
+    "id": "HX-03",
+    "name": "Haechi Gamma",
+    "status": "warning",
+    "battery": 52,
+    "mission": "Obstacle Review",
+    "location": "Sector C4",
+    "speed": "0.3 m/s",
+    "temperature": "49 C",
+    "mapPose": {
+      "domainId": "domain-seoul-factory",
+      "deckId": "deck-1f",
+      "spotId": "spot-c4",
+      "x": 37.2,
+      "y": 17.8,
+      "heading": -34
+    }
+  },
+  {
+    "id": "HX-04",
+    "name": "Haechi Delta",
+    "status": "offline",
+    "battery": 0,
+    "mission": "Disconnected",
+    "location": "Unknown",
+    "speed": "0.0 m/s",
+    "temperature": "N/A",
+    "mapPose": {
+      "domainId": "domain-seoul-factory",
+      "deckId": "deck-2f",
+      "spotId": "spot-remote",
+      "x": 31.7,
+      "y": 12.8,
+      "heading": 90
+    }
+  }
+]

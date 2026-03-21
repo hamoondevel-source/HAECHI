@@ -1,0 +1,323 @@
+{
+  "published": {
+    "id": "domain-seoul-factory",
+    "name": "서울 공장",
+    "status": "published",
+    "version": "published-2026.03.17",
+    "updatedAt": "2026-03-17T09:00:00.000Z",
+    "activeDeckId": "deck-1f",
+    "decks": [
+      {
+        "id": "deck-1f",
+        "label": "1F",
+        "name": "1층 생산 라인",
+        "elevation": 0,
+        "image": {
+          "name": "deck-1f-ui-map",
+          "src": null,
+          "width": 1600,
+          "height": 900
+        },
+        "calibration": {
+          "origin": {
+            "x": 268,
+            "y": 648
+          },
+          "resolution": 0.05,
+          "rotation": 0,
+          "gridMeters": 1
+        },
+        "spots": [
+          {
+            "id": "spot-a1",
+            "name": "Sector A1",
+            "kind": "spot",
+            "zoneKey": "Sector A1",
+            "x": 176,
+            "y": 180,
+            "width": 332,
+            "height": 212,
+            "calibration": {
+              "origin": {
+                "x": 268,
+                "y": 648
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          },
+          {
+            "id": "spot-charge-b2",
+            "name": "Charge Bay 2",
+            "kind": "spot",
+            "zoneKey": "Charge Bay 2",
+            "x": 596,
+            "y": 458,
+            "width": 316,
+            "height": 200,
+            "calibration": {
+              "origin": {
+                "x": 268,
+                "y": 648
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          },
+          {
+            "id": "spot-c4",
+            "name": "Sector C4",
+            "kind": "spot",
+            "zoneKey": "Sector C4",
+            "x": 948,
+            "y": 196,
+            "width": 310,
+            "height": 214,
+            "calibration": {
+              "origin": {
+                "x": 268,
+                "y": 648
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          },
+          {
+            "id": "spot-b",
+            "name": "Sector B",
+            "kind": "spot",
+            "zoneKey": "Sector B",
+            "x": 944,
+            "y": 470,
+            "width": 304,
+            "height": 168,
+            "calibration": {
+              "origin": {
+                "x": 268,
+                "y": 648
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          }
+        ],
+        "noGoZones": [
+          {
+            "id": "nogo-west",
+            "name": "Restricted Bay",
+            "x": 1290,
+            "y": 156,
+            "width": 162,
+            "height": 118
+          }
+        ],
+        "docks": [
+          {
+            "id": "dock-b2",
+            "name": "Dock B2",
+            "x": 736,
+            "y": 560
+          }
+        ],
+        "portals": [
+          {
+            "id": "portal-elevator-a",
+            "name": "A Elevator",
+            "kind": "vertical",
+            "x": 1400,
+            "y": 664,
+            "targetDeckId": "deck-2f"
+          }
+        ]
+      },
+      {
+        "id": "deck-2f",
+        "label": "2F",
+        "name": "2층 검사 존",
+        "elevation": 4.8,
+        "image": {
+          "name": "deck-2f-ui-map",
+          "src": null,
+          "width": 1600,
+          "height": 900
+        },
+        "calibration": {
+          "origin": {
+            "x": 240,
+            "y": 660
+          },
+          "resolution": 0.05,
+          "rotation": 0,
+          "gridMeters": 1
+        },
+        "spots": [
+          {
+            "id": "spot-lab",
+            "name": "Inspection Lab",
+            "kind": "spot",
+            "zoneKey": "Inspection Lab",
+            "x": 250,
+            "y": 230,
+            "width": 410,
+            "height": 220,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          },
+          {
+            "id": "spot-remote",
+            "name": "Remote Diagnostics",
+            "kind": "spot",
+            "zoneKey": "Remote Diagnostics",
+            "x": 860,
+            "y": 324,
+            "width": 360,
+            "height": 200,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1
+            }
+          }
+        ],
+        "noGoZones": [],
+        "docks": [],
+        "portals": [
+          {
+            "id": "portal-elevator-a-2f",
+            "name": "A Elevator",
+            "kind": "vertical",
+            "x": 1360,
+            "y": 648,
+            "targetDeckId": "deck-1f"
+          }
+        ]
+      }
+    ]
+  },
+  "draft": {
+    "id": "domain-seoul-factory",
+    "name": "테스트 DOMAIN",
+    "status": "draft",
+    "version": "draft-2026-03-20T15:36:59.216Z",
+    "updatedAt": "2026-03-20T15:36:59.215Z",
+    "activeDeckId": "deck-2f",
+    "decks": [
+      {
+        "id": "deck-2f",
+        "label": "2F",
+        "name": "테스트 DECK",
+        "elevation": 4.8,
+        "image": {
+          "name": "logo",
+          "src": "/map-assets/deck-2f-logo.png",
+          "width": 1600,
+          "height": 900
+        },
+        "calibration": {
+          "origin": {
+            "x": 240,
+            "y": 660
+          },
+          "resolution": 0.05,
+          "rotation": 0,
+          "gridMeters": 1
+        },
+        "spots": [
+          {
+            "id": "spot-mmvjqvb3-utmx",
+            "name": "New Spot 1",
+            "kind": "spot",
+            "zoneKey": "Spot 1",
+            "x": 184,
+            "y": 178,
+            "width": 240,
+            "height": 160,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1,
+              "gridColor": "#8a929d",
+              "gridOpacity": 0.26,
+              "gridCount": 20
+            }
+          },
+          {
+            "id": "spot-mmwq7np9-r27y",
+            "name": "New Spot 2",
+            "kind": "spot",
+            "zoneKey": "Spot 2",
+            "x": 208,
+            "y": 196,
+            "width": 240,
+            "height": 160,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1,
+              "gridColor": "#8a929d",
+              "gridOpacity": 0.26,
+              "gridCount": 20
+            }
+          },
+          {
+            "id": "spot-mmynxlp3-mq66",
+            "name": "New Spot 3",
+            "kind": "spot",
+            "zoneKey": "Spot 3",
+            "x": 232,
+            "y": 214,
+            "width": 240,
+            "height": 160,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1,
+              "gridColor": "#8a929d",
+              "gridOpacity": 0.26,
+              "gridCount": 20
+            }
+          }
+        ],
+        "noGoZones": [],
+        "docks": [],
+        "portals": [
+          {
+            "id": "portal-elevator-a-2f",
+            "name": "A Elevator",
+            "kind": "vertical",
+            "x": 1360,
+            "y": 648,
+            "targetDeckId": null
+          }
+        ]
+      }
+    ]
+  }
+}
