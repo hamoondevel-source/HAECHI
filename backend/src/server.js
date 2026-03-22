@@ -5,6 +5,25 @@ import path from "path";
 import accounts from "./data/accounts.json" with { type: "json" };
 import maps from "./data/maps.json" with { type: "json" };
 import robots from "./data/robots.json" with { type: "json" };
+import {
+  applyDockPatch,
+  applyDeckMetadataPatch,
+  applyNoGoPatch,
+  applySpotPatch,
+  applyStudioDeckPatch,
+  createDraftDeck,
+  createDraftDock,
+  createDraftNoGoZone,
+  createDraftSpot,
+  deleteDraftDeck,
+  deleteDraftDock,
+  deleteDraftNoGoZone,
+  deleteDraftSpot,
+  publishDraftMap,
+  renameDraftDomain,
+  saveDraftMapImage,
+  updateDraftDeck
+} from "./services/mapStudioService.js";
 import teams from "./data/teams.json" with { type: "json" };
 import { fileURLToPath } from "url";
 
@@ -306,21 +325,42 @@ function serializeMapDocument(mapDocument) {
   };
 }
 
-function touchDraftVersion() {
-  mapStore.draft.updatedAt = new Date().toISOString();
-  mapStore.draft.version = `draft-${new Date().toISOString()}`;
+function serializeStudioDomain(mapDocument) {
+  return {
+    id: mapDocument.id,
+    name: mapDocument.name,
+    status: mapDocument.status,
+    version: mapDocument.version,
+    updatedAt: mapDocument.updatedAt,
+    activeDeckId: mapDocument.activeDeckId
+  };
 }
 
-function upsertDeckDraft(deckId, updater) {
-  const draftDeck = findDeckById(mapStore.draft, deckId);
+function serializeStudioDeckOption(deck) {
+  return {
+    id: deck.id,
+    label: deck.label,
+    name: deck.name
+  };
+}
 
-  if (!draftDeck) {
+function serializeStudioDeckBundle(mapDocument, deckId) {
+  const deck = findDeckById(mapDocument, deckId);
+
+  if (!deck) {
     return null;
   }
 
-  updater(draftDeck);
-  touchDraftVersion();
-  return draftDeck;
+  return {
+    domain: serializeStudioDomain(mapDocument),
+    deck: serializeDeck(deck),
+    availableDecks: mapDocument.decks.map(serializeStudioDeckOption)
+  };
+}
+
+function touchDraftVersion() {
+  mapStore.draft.updatedAt = new Date().toISOString();
+  mapStore.draft.version = `draft-${new Date().toISOString()}`;
 }
 
 function createDefaultDeck(index = 1) {
@@ -498,7 +538,7 @@ app.get("/api/maps/monitor", (req, res) => {
   });
 });
 
-app.get("/api/maps/studio", (req, res) => {
+app.get("/api/maps/studio/decks/:deckId", (req, res) => {
   const viewerId = typeof req.query.viewerId === "string" ? req.query.viewerId : "";
 
   if (!viewerId) {
@@ -513,10 +553,16 @@ app.get("/api/maps/studio", (req, res) => {
     return;
   }
 
+  const studioBundle = serializeStudioDeckBundle(mapStore.draft, req.params.deckId);
+
+  if (!studioBundle) {
+    res.status(404).json({ message: "조회할 Deck을 찾을 수 없습니다." });
+    return;
+  }
+
   res.json({
     canEdit: viewer.role === "root",
-    published: serializeMapDocument(mapStore.published),
-    draft: serializeMapDocument(mapStore.draft)
+    ...studioBundle
   });
 });
 
@@ -575,38 +621,13 @@ app.patch("/api/maps/decks/:deckId", async (req, res) => {
     return;
   }
 
-  const updatedDeck = upsertDeckDraft(req.params.deckId, (draftDeck) => {
-    if (typeof patch?.name === "string" && patch.name.trim()) {
-      draftDeck.name = patch.name.trim();
-    }
-
-    if (typeof patch?.label === "string" && patch.label.trim()) {
-      draftDeck.label = patch.label.trim();
-    }
-
-    if (Number.isFinite(patch?.elevation)) {
-      draftDeck.elevation = Number(patch.elevation);
-    }
-
-    if (patch?.image) {
-      draftDeck.image = {
-        ...draftDeck.image,
-        ...patch.image,
-        src: patch.image.serverSrc ?? patch.image.src ?? draftDeck.image?.src ?? null
-      };
-    }
-
-    if (patch?.calibration) {
-      draftDeck.calibration = {
-        ...(draftDeck.calibration ?? createDefaultGridCalibration()),
-        ...patch.calibration,
-        origin: {
-          ...(draftDeck.calibration?.origin ?? { x: 240, y: 640 }),
-          ...(patch.calibration.origin ?? {})
-        }
-      };
-    }
-  });
+  const updatedDeck = updateDraftDeck(
+    mapStore,
+    req.params.deckId,
+    (draftDeck) => applyDeckMetadataPatch(draftDeck, patch, createDefaultGridCalibration),
+    touchDraftVersion,
+    findDeckById
+  );
 
   if (!updatedDeck) {
     res.status(404).json({ message: "수정할 Deck을 찾을 수 없습니다." });
@@ -617,46 +638,64 @@ app.patch("/api/maps/decks/:deckId", async (req, res) => {
 
   res.json({
     message: "Deck 정보를 저장했습니다.",
-    deck: serializeDeck(updatedDeck),
-    draft: serializeMapDocument(mapStore.draft)
+    domain: serializeStudioDomain(mapStore.draft),
+    deck: serializeDeck(updatedDeck)
   });
 });
 
-app.patch("/api/maps/spots/:spotId", async (req, res) => {
-  const { actorId, deckId, patch } = req.body ?? {};
+app.patch("/api/maps/studio/decks/:deckId", async (req, res) => {
+  const { actorId, patch } = req.body ?? {};
   const actor = requireRootActor(actorId, res);
 
   if (!actor) {
     return;
   }
 
-  const updatedDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    draftDeck.spots = (draftDeck.spots ?? []).map((spot) =>
-      spot.id === req.params.spotId
-        ? {
-            ...spot,
-            ...patch,
-            image: patch?.image
-              ? {
-                  ...(spot.image ?? {}),
-                  ...patch.image,
-                  src: patch.image.serverSrc ?? patch.image.src ?? spot.image?.src ?? null
-                }
-              : spot.image,
-            calibration: patch?.calibration
-              ? {
-                  ...(spot.calibration ?? {}),
-                  ...patch.calibration,
-                  origin: {
-                    ...(spot.calibration?.origin ?? {}),
-                    ...(patch.calibration.origin ?? {})
-                  }
-                }
-              : spot.calibration
-          }
-        : spot
-    );
+  if (!patch) {
+    res.status(400).json({ message: "patch가 필요합니다." });
+    return;
+  }
+
+  const updatedDeck = updateDraftDeck(
+    mapStore,
+    req.params.deckId,
+    (draftDeck) => applyStudioDeckPatch(draftDeck, patch),
+    touchDraftVersion,
+    findDeckById
+  );
+
+  if (!updatedDeck) {
+    res.status(404).json({ message: "수정할 Deck을 찾을 수 없습니다." });
+    return;
+  }
+
+  if (req.params.deckId === mapStore.draft.activeDeckId || !mapStore.draft.activeDeckId) {
+    mapStore.draft.activeDeckId = req.params.deckId;
+  }
+
+  await persistMaps();
+
+  res.json({
+    message: "맵 스튜디오 초안이 저장되었습니다.",
+    ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId)
   });
+});
+
+app.patch("/api/maps/studio/decks/:deckId/spots/:spotId", async (req, res) => {
+  const { actorId, patch } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  const updatedDeck = updateDraftDeck(
+    mapStore,
+    req.params.deckId,
+    (draftDeck) => applySpotPatch(draftDeck, req.params.spotId, patch),
+    touchDraftVersion,
+    findDeckById
+  );
 
   if (!updatedDeck) {
     res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
@@ -674,83 +713,316 @@ app.patch("/api/maps/spots/:spotId", async (req, res) => {
 
   res.json({
     message: "Spot 정보를 저장했습니다.",
-    spot: targetSpot,
-    draft: serializeMapDocument(mapStore.draft)
+    ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+    spot: targetSpot
   });
 });
 
-app.patch("/api/maps/studio", async (req, res) => {
-  const { actorId, deckId, patch } = req.body ?? {};
+app.patch("/api/maps/studio/decks/:deckId/nogo-zones/:zoneId", async (req, res) => {
+  const { actorId, patch } = req.body ?? {};
   const actor = requireRootActor(actorId, res);
 
   if (!actor) {
     return;
   }
 
-  if (!deckId || !patch) {
-    res.status(400).json({ message: "deckId와 patch가 필요합니다." });
-    return;
-  }
-
-  const updatedDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    if (patch.image) {
-      draftDeck.image = {
-        ...draftDeck.image,
-        ...patch.image
-      };
-    }
-
-    if (patch.calibration) {
-      draftDeck.calibration = {
-        ...draftDeck.calibration,
-        ...patch.calibration,
-        origin: {
-          ...draftDeck.calibration.origin,
-          ...(patch.calibration.origin ?? {})
-        }
-      };
-    }
-
-    if (typeof patch.name === "string" && patch.name.trim()) {
-      draftDeck.name = patch.name.trim();
-    }
-
-    if (typeof patch.label === "string" && patch.label.trim()) {
-      draftDeck.label = patch.label.trim();
-    }
-
-    if (Array.isArray(patch.spots)) {
-      draftDeck.spots = patch.spots;
-    }
-
-    if (Array.isArray(patch.noGoZones)) {
-      draftDeck.noGoZones = patch.noGoZones;
-    }
-
-    if (Array.isArray(patch.docks)) {
-      draftDeck.docks = patch.docks;
-    }
-
-    if (Array.isArray(patch.portals)) {
-      draftDeck.portals = patch.portals;
-    }
-  });
+  const updatedDeck = updateDraftDeck(
+    mapStore,
+    req.params.deckId,
+    (draftDeck) => applyNoGoPatch(draftDeck, req.params.zoneId, patch),
+    touchDraftVersion,
+    findDeckById
+  );
 
   if (!updatedDeck) {
-    res.status(404).json({ message: "수정할 Deck을 찾을 수 없습니다." });
+    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
     return;
   }
 
-  if (deckId === mapStore.draft.activeDeckId || !mapStore.draft.activeDeckId) {
-    mapStore.draft.activeDeckId = deckId;
+  const targetZone = updatedDeck.noGoZones?.find((zone) => zone.id === req.params.zoneId) ?? null;
+
+  if (!targetZone) {
+    res.status(404).json({ message: "수정할 금지 구역을 찾을 수 없습니다." });
+    return;
   }
 
   await persistMaps();
 
   res.json({
-    message: "맵 스튜디오 초안이 저장되었습니다.",
-    draft: serializeMapDocument(mapStore.draft)
+    message: "금지 구역 정보를 저장했습니다.",
+    ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+    zone: targetZone
   });
+});
+
+app.patch("/api/maps/studio/decks/:deckId/docks/:dockId", async (req, res) => {
+  const { actorId, patch } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  const updatedDeck = updateDraftDeck(
+    mapStore,
+    req.params.deckId,
+    (draftDeck) => applyDockPatch(draftDeck, req.params.dockId, patch),
+    touchDraftVersion,
+    findDeckById
+  );
+
+  if (!updatedDeck) {
+    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
+    return;
+  }
+
+  const targetDock =
+    [...(updatedDeck.docks ?? []), ...(updatedDeck.portals ?? [])].find(
+      (dock) => dock.id === req.params.dockId
+    ) ?? null;
+
+  if (!targetDock) {
+    res.status(404).json({ message: "수정할 Dock/Portal을 찾을 수 없습니다." });
+    return;
+  }
+
+  await persistMaps();
+
+  res.json({
+    message: targetDock.kind === "vertical" ? "Portal 정보를 저장했습니다." : "Dock 정보를 저장했습니다.",
+    ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+    dock: targetDock
+  });
+});
+
+app.post("/api/maps/studio/decks/:deckId/image", async (req, res) => {
+  const { actorId, spotId, fileName, dataUrl, width, height } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  if (!dataUrl) {
+    res.status(400).json({ message: "이미지 데이터가 필요합니다." });
+    return;
+  }
+
+  try {
+    const result = await saveDraftMapImage({
+      mapStore,
+      deckId: req.params.deckId,
+      spotId,
+      fileName,
+      dataUrl,
+      width,
+      height,
+      mapAssetsDir: MAP_ASSETS_DIR,
+      findDeckById,
+      touchDraftVersion
+    });
+    await persistMaps();
+
+    res.json({
+      message: result.message,
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId)
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "이미지 저장에 실패했습니다."
+    });
+  }
+});
+
+app.post("/api/maps/studio/decks/:deckId/spots", async (req, res) => {
+  const { actorId, spot } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    const result = createDraftSpot({
+      mapStore,
+      deckId: req.params.deckId,
+      spot,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById,
+      createDefaultSpot,
+      createDefaultSpotCalibration
+    });
+    await persistMaps();
+
+    res.status(201).json({
+      message: "Spot을 추가했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      spot: result.spot
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Spot을 추가하지 못했습니다."
+    });
+  }
+});
+
+app.delete("/api/maps/studio/decks/:deckId/spots/:spotId", async (req, res) => {
+  const actorId = typeof req.body?.actorId === "string" ? req.body.actorId : "";
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    deleteDraftSpot({
+      mapStore,
+      deckId: req.params.deckId,
+      spotId: req.params.spotId,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById
+    });
+    await persistMaps();
+
+    res.json({
+      message: "Spot을 삭제했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      removedId: req.params.spotId
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Spot을 삭제하지 못했습니다."
+    });
+  }
+});
+
+app.post("/api/maps/studio/decks/:deckId/nogo-zones", async (req, res) => {
+  const { actorId, zone } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    const result = createDraftNoGoZone({
+      mapStore,
+      deckId: req.params.deckId,
+      zone,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById,
+      createDefaultNoGo
+    });
+    await persistMaps();
+
+    res.status(201).json({
+      message: "금지 구역을 추가했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      zone: result.zone
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "금지 구역을 추가하지 못했습니다."
+    });
+  }
+});
+
+app.delete("/api/maps/studio/decks/:deckId/nogo-zones/:zoneId", async (req, res) => {
+  const actorId = typeof req.body?.actorId === "string" ? req.body.actorId : "";
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    deleteDraftNoGoZone({
+      mapStore,
+      deckId: req.params.deckId,
+      zoneId: req.params.zoneId,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById
+    });
+    await persistMaps();
+
+    res.json({
+      message: "금지 구역을 삭제했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      removedId: req.params.zoneId
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "금지 구역을 삭제하지 못했습니다."
+    });
+  }
+});
+
+app.post("/api/maps/studio/decks/:deckId/docks", async (req, res) => {
+  const { actorId, dock } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    const result = createDraftDock({
+      mapStore,
+      deckId: req.params.deckId,
+      dock,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById,
+      createDefaultDock
+    });
+    await persistMaps();
+
+    res.status(201).json({
+      message: result.kind === "vertical" ? "Portal을 추가했습니다." : "Dock을 추가했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      dock: result.dock
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Dock/Portal을 추가하지 못했습니다."
+    });
+  }
+});
+
+app.delete("/api/maps/studio/decks/:deckId/docks/:dockId", async (req, res) => {
+  const { actorId, kind } = req.body ?? {};
+  const actor = requireRootActor(actorId, res);
+
+  if (!actor) {
+    return;
+  }
+
+  try {
+    const result = deleteDraftDock({
+      mapStore,
+      deckId: req.params.deckId,
+      dockId: req.params.dockId,
+      kind,
+      updateDraftDeck,
+      touchDraftVersion,
+      findDeckById
+    });
+    await persistMaps();
+
+    res.json({
+      message: result.kind === "vertical" ? "Portal을 삭제했습니다." : "Dock을 삭제했습니다.",
+      ...serializeStudioDeckBundle(mapStore.draft, req.params.deckId),
+      removedId: req.params.dockId
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Dock/Portal을 삭제하지 못했습니다."
+    });
+  }
 });
 
 app.patch("/api/maps/domain", async (req, res) => {
@@ -761,21 +1033,19 @@ app.patch("/api/maps/domain", async (req, res) => {
     return;
   }
 
-  const normalizedName = typeof name === "string" ? name.trim() : "";
+  try {
+    renameDraftDomain(mapStore, name, touchDraftVersion);
+    await persistMaps();
 
-  if (!normalizedName) {
-    res.status(400).json({ message: "Domain 이름을 입력하세요." });
-    return;
+    res.json({
+      message: "Domain 이름을 저장했습니다.",
+      domain: serializeStudioDomain(mapStore.draft)
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Domain 이름을 저장하지 못했습니다."
+    });
   }
-
-  mapStore.draft.name = normalizedName;
-  touchDraftVersion();
-  await persistMaps();
-
-  res.json({
-    message: "Domain 이름을 저장했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
 });
 
 app.post("/api/maps/decks", async (req, res) => {
@@ -786,28 +1056,26 @@ app.post("/api/maps/decks", async (req, res) => {
     return;
   }
 
-  const nextDeck = createDefaultDeck((mapStore.draft.decks?.length ?? 0) + 1);
-  const normalizedLabel = typeof label === "string" ? label.trim() : "";
-  const normalizedName = typeof name === "string" ? name.trim() : "";
+  try {
+    const nextDeck = createDraftDeck({
+      mapStore,
+      label,
+      name,
+      createDefaultDeck,
+      touchDraftVersion
+    });
+    await persistMaps();
 
-  if (normalizedLabel) {
-    nextDeck.label = normalizedLabel;
+    res.status(201).json({
+      message: "Deck을 추가했습니다.",
+      domain: serializeStudioDomain(mapStore.draft),
+      deck: serializeDeck(nextDeck)
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Deck을 추가하지 못했습니다."
+    });
   }
-
-  if (normalizedName) {
-    nextDeck.name = normalizedName;
-  }
-
-  mapStore.draft.decks.push(nextDeck);
-  mapStore.draft.activeDeckId = nextDeck.id;
-  touchDraftVersion();
-  await persistMaps();
-
-  res.status(201).json({
-    message: "Deck을 추가했습니다.",
-    deck: serializeDeck(nextDeck),
-    draft: serializeMapDocument(mapStore.draft)
-  });
 });
 
 app.delete("/api/maps/decks/:deckId", async (req, res) => {
@@ -818,234 +1086,25 @@ app.delete("/api/maps/decks/:deckId", async (req, res) => {
     return;
   }
 
-  if ((mapStore.draft.decks?.length ?? 0) <= 1) {
-    res.status(400).json({ message: "최소 1개의 Deck은 유지해야 합니다." });
-    return;
+  try {
+    const removedDeck = deleteDraftDeck({
+      mapStore,
+      deckId: req.params.deckId,
+      touchDraftVersion
+    });
+    await persistMaps();
+
+    res.json({
+      message: "Deck을 삭제했습니다.",
+      domain: serializeStudioDomain(mapStore.draft),
+      removedId: removedDeck.id,
+      removedType: "deck"
+    });
+  } catch (error) {
+    res.status(error?.statusCode ?? 400).json({
+      message: error instanceof Error ? error.message : "Deck을 삭제하지 못했습니다."
+    });
   }
-
-  const targetIndex = mapStore.draft.decks.findIndex((deck) => deck.id === req.params.deckId);
-
-  if (targetIndex < 0) {
-    res.status(404).json({ message: "삭제할 Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  const [removedDeck] = mapStore.draft.decks.splice(targetIndex, 1);
-  mapStore.draft.decks.forEach((deck) => {
-    deck.portals = (deck.portals ?? []).map((portal) =>
-      portal.targetDeckId === removedDeck.id ? { ...portal, targetDeckId: null } : portal
-    );
-  });
-  if (mapStore.draft.activeDeckId === removedDeck.id) {
-    mapStore.draft.activeDeckId = mapStore.draft.decks[0]?.id ?? "";
-  }
-  touchDraftVersion();
-  await persistMaps();
-
-  res.json({
-    message: "Deck을 삭제했습니다.",
-    removedId: removedDeck.id,
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.post("/api/maps/spots", async (req, res) => {
-  const { actorId, deckId, spot } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  if (!deckId) {
-    res.status(400).json({ message: "deckId가 필요합니다." });
-    return;
-  }
-
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    const nextSpot = {
-      ...createDefaultSpot((draftDeck.spots?.length ?? 0) + 1),
-      ...(spot ?? {})
-    };
-
-    nextSpot.calibration = {
-      ...createDefaultSpotCalibration(),
-      ...(draftDeck.calibration ?? {}),
-      ...(spot?.calibration ?? {}),
-      origin: {
-        ...(draftDeck.calibration?.origin ?? { x: 240, y: 640 }),
-        ...(spot?.calibration?.origin ?? {})
-      }
-    };
-
-    draftDeck.spots = [...(draftDeck.spots ?? []), nextSpot];
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.status(201).json({
-    message: "Spot을 추가했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.delete("/api/maps/spots/:spotId", async (req, res) => {
-  const { actorId, deckId } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    draftDeck.spots = (draftDeck.spots ?? []).filter((spot) => spot.id !== req.params.spotId);
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.json({
-    message: "Spot을 삭제했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.post("/api/maps/nogo-zones", async (req, res) => {
-  const { actorId, deckId, zone } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    draftDeck.noGoZones = [
-      ...(draftDeck.noGoZones ?? []),
-      {
-        ...createDefaultNoGo((draftDeck.noGoZones?.length ?? 0) + 1),
-        ...(zone ?? {})
-      }
-    ];
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.status(201).json({
-    message: "금지 구역을 추가했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.delete("/api/maps/nogo-zones/:zoneId", async (req, res) => {
-  const { actorId, deckId } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    draftDeck.noGoZones = (draftDeck.noGoZones ?? []).filter((zone) => zone.id !== req.params.zoneId);
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.json({
-    message: "금지 구역을 삭제했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.post("/api/maps/docks", async (req, res) => {
-  const { actorId, deckId, dock } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  const kind = dock?.kind === "vertical" ? "vertical" : "dock";
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    if (kind === "vertical") {
-      draftDeck.portals = [
-        ...(draftDeck.portals ?? []),
-        {
-          ...createDefaultDock((draftDeck.portals?.length ?? 0) + 1, "vertical"),
-          ...(dock ?? {})
-        }
-      ];
-      return;
-    }
-
-    draftDeck.docks = [
-      ...(draftDeck.docks ?? []),
-      {
-        ...createDefaultDock((draftDeck.docks?.length ?? 0) + 1, "dock"),
-        ...(dock ?? {})
-      }
-    ];
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.status(201).json({
-    message: kind === "vertical" ? "Portal을 추가했습니다." : "Dock을 추가했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
-});
-
-app.delete("/api/maps/docks/:dockId", async (req, res) => {
-  const { actorId, deckId, kind } = req.body ?? {};
-  const actor = requireRootActor(actorId, res);
-
-  if (!actor) {
-    return;
-  }
-
-  const targetDeck = upsertDeckDraft(deckId, (draftDeck) => {
-    if (kind === "vertical") {
-      draftDeck.portals = (draftDeck.portals ?? []).filter((dock) => dock.id !== req.params.dockId);
-      return;
-    }
-
-    draftDeck.docks = (draftDeck.docks ?? []).filter((dock) => dock.id !== req.params.dockId);
-  });
-
-  if (!targetDeck) {
-    res.status(404).json({ message: "Deck을 찾을 수 없습니다." });
-    return;
-  }
-
-  await persistMaps();
-
-  res.json({
-    message: kind === "vertical" ? "Portal을 삭제했습니다." : "Dock을 삭제했습니다.",
-    draft: serializeMapDocument(mapStore.draft)
-  });
 });
 
 app.post("/api/maps/publish", async (req, res) => {
@@ -1056,10 +1115,7 @@ app.post("/api/maps/publish", async (req, res) => {
     return;
   }
 
-  mapStore.published = structuredClone(mapStore.draft);
-  mapStore.published.status = "published";
-  mapStore.published.version = `published-${new Date().toISOString()}`;
-  mapStore.published.updatedAt = new Date().toISOString();
+  publishDraftMap(mapStore);
   await persistMaps();
 
   res.json({

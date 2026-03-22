@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  BsBoxArrowUpRight,
   BsCollectionFill,
   BsDiagram3Fill,
   BsFileEarmarkImageFill,
@@ -18,7 +19,7 @@ import ContextMenu from "./components/ContextMenu";
 import DetailItem from "./components/DetailItem";
 import DesktopStudioWindow from "./features/desktop-studio/DesktopStudioWindow";
 import MapLibraryHierarchy from "./features/map-library/components/MapLibraryHierarchy";
-import MapCanvas from "./features/spot-studio/components/MapCanvas";
+import MapCanvas from "./features/spot-studio/components/canvas/MapCanvas";
 import WindowTitleBar from "./components/WindowTitleBar";
 
 const initialFleet = { summary: null, robots: [] };
@@ -214,6 +215,125 @@ function getDeckById(mapDocument, deckId) {
   );
 }
 
+function mergeStudioDraftWithPayload(currentDraft, payload) {
+  if (!payload?.domain) {
+    return currentDraft;
+  }
+
+  const fallbackDraft = currentDraft ?? {
+    id: payload.domain.id,
+    name: payload.domain.name,
+    status: payload.domain.status,
+    version: payload.domain.version,
+    updatedAt: payload.domain.updatedAt,
+    activeDeckId: payload.domain.activeDeckId,
+    decks: []
+  };
+  const nextDecks = payload.deck
+    ? (fallbackDraft.decks ?? []).some((deck) => deck.id === payload.deck.id)
+      ? fallbackDraft.decks.map((deck) => (deck.id === payload.deck.id ? payload.deck : deck))
+      : [...(fallbackDraft.decks ?? []), payload.deck]
+    : payload.removedType === "deck"
+      ? (fallbackDraft.decks ?? []).filter((deck) => deck.id !== payload.removedId)
+      : fallbackDraft.decks ?? [];
+
+  return {
+    ...fallbackDraft,
+    id: payload.domain.id ?? fallbackDraft.id,
+    name: payload.domain.name ?? fallbackDraft.name,
+    status: payload.domain.status ?? fallbackDraft.status,
+    version: payload.domain.version ?? fallbackDraft.version,
+    updatedAt: payload.domain.updatedAt ?? fallbackDraft.updatedAt,
+    activeDeckId: payload.domain.activeDeckId ?? fallbackDraft.activeDeckId,
+    decks: nextDecks
+  };
+}
+
+function mergeStudioBundlePayload(currentBundle, payload) {
+  return {
+    ...currentBundle,
+    canEdit: payload?.canEdit ?? currentBundle.canEdit,
+    published: payload?.published ?? currentBundle.published,
+    draft: mergeStudioDraftWithPayload(currentBundle.draft, payload)
+  };
+}
+
+function toStudioDraftFromLibraryPayload(payload) {
+  if (!payload?.domain) {
+    return null;
+  }
+
+  return {
+    id: payload.domain.id,
+    name: payload.domain.name,
+    status: payload.domain.status ?? "draft",
+    version: payload.domain.version ?? "-",
+    updatedAt: payload.domain.updatedAt ?? "",
+    activeDeckId: payload.domain.activeDeckId ?? payload.decks?.[0]?.id ?? "",
+    decks: payload.decks ?? []
+  };
+}
+
+function resolveStudioDeckIdFromPayload(payload, fallbackDeckId = "") {
+  if (payload?.deck?.id) {
+    return payload.deck.id;
+  }
+
+  if (payload?.domain?.activeDeckId) {
+    return payload.domain.activeDeckId;
+  }
+
+  return fallbackDeckId;
+}
+
+function getLibraryDecks(domain) {
+  return domain?.decks ?? [];
+}
+
+function getDeckExplorerNode(deckId) {
+  return `deck:${deckId}`;
+}
+
+function getSpotExplorerNode(deckId, spotId) {
+  return `spot:${deckId}:${spotId}`;
+}
+
+function getDesktopExplorerType(explorerNode) {
+  if (explorerNode.startsWith("spot:")) {
+    return "spot";
+  }
+
+  if (explorerNode.startsWith("deck:")) {
+    return "deck";
+  }
+
+  if (explorerNode.startsWith("domain:")) {
+    return "domain";
+  }
+
+  return "root";
+}
+
+function getExplorerDeckId(explorerNode) {
+  if (explorerNode.startsWith("deck:")) {
+    return explorerNode.slice("deck:".length);
+  }
+
+  if (explorerNode.startsWith("spot:")) {
+    return explorerNode.split(":")[1] ?? "";
+  }
+
+  return "";
+}
+
+function getExplorerSpotId(explorerNode) {
+  if (!explorerNode.startsWith("spot:")) {
+    return "";
+  }
+
+  return explorerNode.split(":")[2] ?? "";
+}
+
 
 function MacFolderIcon({ size = "sm" }) {
   return <BsFolderFill className={`mac-folder-icon size-${size}`} aria-hidden="true" />;
@@ -242,9 +362,7 @@ function getDesktopBridge() {
 function normalizeMapLibraryPayload(payload) {
   const domain = payload?.domain ?? null;
   const decks = payload?.decks ?? [];
-  const deckMap = new Map(decks.map((deck) => [deck.id, deck]));
-
-  const projects = decks.map((deck) => ({
+  const normalizedDecks = decks.map((deck) => ({
     id: deck.id,
     path: "",
     folderName: `${deck.label}-${deck.name}`.replace(/\s+/g, "-"),
@@ -275,18 +393,16 @@ function normalizeMapLibraryPayload(payload) {
     ]
   }));
 
-  const projectsWithLinks = projects.map((project) => ({
-    ...project,
-    portalLinks: (project.portals ?? []).map((portal) => {
-      const targetProject = projects.find((candidate) => candidate.deckId === portal.targetDeckId) ?? null;
+  const decksWithLinks = normalizedDecks.map((deck) => ({
+    ...deck,
+    portalLinks: (deck.portals ?? []).map((portal) => {
+      const targetDeck = normalizedDecks.find((candidate) => candidate.deckId === portal.targetDeckId) ?? null;
       return {
         id: portal.id,
         name: portal.name,
-        sourceProjectId: project.id,
-        sourceDeckId: project.deckId,
+        sourceDeckId: deck.id,
         targetDeckId: portal.targetDeckId ?? null,
-        targetProjectId: targetProject?.id ?? null,
-        targetLabel: targetProject?.displayName ?? portal.targetDeckId ?? "미연결"
+        targetLabel: targetDeck?.displayName ?? portal.targetDeckId ?? "미연결"
       };
     })
   }));
@@ -299,7 +415,7 @@ function normalizeMapLibraryPayload(payload) {
             id: domain.id,
             name: domain.name,
             path: "",
-            projects: projectsWithLinks
+            decks: decksWithLinks
           }
         ]
       : []
@@ -313,7 +429,7 @@ function App() {
   const isDesktopStudioWindow = Boolean(
     desktopBridge?.isDesktop && searchParams.get("view") === "studio"
   );
-  const desktopWindowProjectId = searchParams.get("projectId") ?? "";
+  const desktopWindowDeckId = searchParams.get("deckId") ?? "";
   const desktopWindowFocusType = searchParams.get("focusType") ?? "deck";
   const desktopWindowFocusId = searchParams.get("focusId") ?? "";
   const desktopWindowActorId = searchParams.get("actorId") ?? "";
@@ -345,13 +461,13 @@ function App() {
   const [desktopLibraryPending, setDesktopLibraryPending] = useState(false);
   const [desktopLibraryError, setDesktopLibraryError] = useState("");
   const [desktopDomainId, setDesktopDomainId] = useState("");
-  const [desktopProjectId, setDesktopProjectId] = useState("");
+  const [desktopDeckId, setDesktopDeckId] = useState("");
   const [desktopSelectedSpotId, setDesktopSelectedSpotId] = useState("");
   const [desktopExplorerNode, setDesktopExplorerNode] = useState("root");
   const [desktopSearchQuery, setDesktopSearchQuery] = useState("");
   const [desktopSearchScope, setDesktopSearchScope] = useState("domain");
   const [desktopExpandedDomains, setDesktopExpandedDomains] = useState({});
-  const [desktopExpandedProjects, setDesktopExpandedProjects] = useState({});
+  const [desktopExpandedDecks, setDesktopExpandedDecks] = useState({});
   const [studioSelection, setStudioSelection] = useState({ type: "deck", id: "" });
   const [mapPending, setMapPending] = useState(false);
   const [mapNotice, setMapNotice] = useState("");
@@ -379,7 +495,7 @@ function App() {
   if (isDesktopStudioWindow) {
     return (
       <DesktopStudioWindow
-        projectId={desktopWindowProjectId}
+        deckId={desktopWindowDeckId}
         focusType={desktopWindowFocusType}
         focusId={desktopWindowFocusId}
         actorId={desktopWindowActorId}
@@ -555,20 +671,21 @@ function App() {
     try {
       setMapError("");
       const query = `viewerId=${encodeURIComponent(session.id)}`;
-      const response = await fetch(`/api/maps/studio?${query}`);
+      const response = await fetch(`/api/maps/library?${query}`);
 
       if (!response.ok) {
         throw new Error("맵 스튜디오 데이터를 불러오지 못했습니다.");
       }
 
       const payload = await response.json();
+      const nextDraft = toStudioDraftFromLibraryPayload(payload);
       setStudioBundle({
         canEdit: payload.canEdit ?? false,
-        published: payload.published ?? null,
-        draft: payload.draft ?? null
+        published: monitorMap.map ?? null,
+        draft: nextDraft
       });
       setStudioDeckId((currentDeckId) => {
-        const draftDecks = payload.draft?.decks ?? [];
+        const draftDecks = nextDraft?.decks ?? [];
 
         if (!draftDecks.length) {
           return "";
@@ -578,7 +695,7 @@ function App() {
           return currentDeckId;
         }
 
-        return payload.draft?.activeDeckId ?? draftDecks[0].id;
+        return nextDraft?.activeDeckId ?? draftDecks[0].id;
       });
       setStudioSelection((current) => {
         if (current.id) {
@@ -587,7 +704,7 @@ function App() {
 
         return {
           type: "deck",
-          id: payload.draft?.activeDeckId ?? payload.draft?.decks?.[0]?.id ?? ""
+          id: nextDraft?.activeDeckId ?? nextDraft?.decks?.[0]?.id ?? ""
         };
       });
     } catch (studioLoadError) {
@@ -770,18 +887,19 @@ function App() {
       desktopMapLibrary.domains.find((domain) => domain.id === desktopDomainId) ??
       desktopMapLibrary.domains[0] ??
       null;
+    const activeDomainDecks = getLibraryDecks(activeDomain);
 
-    if (!activeDomain?.projects?.length) {
-      if (desktopProjectId) {
-        setDesktopProjectId("");
+    if (!activeDomainDecks.length) {
+      if (desktopDeckId) {
+        setDesktopDeckId("");
       }
       return;
     }
 
-    if (!activeDomain.projects.some((project) => project.id === desktopProjectId)) {
-      setDesktopProjectId(activeDomain.projects[0].id);
+    if (!activeDomainDecks.some((deck) => deck.id === desktopDeckId)) {
+      setDesktopDeckId(activeDomainDecks[0].id);
     }
-  }, [desktopMapLibrary, desktopDomainId, desktopProjectId]);
+  }, [desktopMapLibrary, desktopDomainId, desktopDeckId]);
 
   useEffect(() => {
     if (!desktopDomainId) {
@@ -795,27 +913,28 @@ function App() {
   }, [desktopDomainId]);
 
   useEffect(() => {
-    if (!desktopProjectId) {
+    if (!desktopDeckId) {
       return;
     }
 
-    setDesktopExpandedProjects((current) => ({
+    setDesktopExpandedDecks((current) => ({
       ...current,
-      [desktopProjectId]: true
+      [desktopDeckId]: true
     }));
-  }, [desktopProjectId]);
+  }, [desktopDeckId]);
 
   useEffect(() => {
-    const allProjects = desktopMapLibrary.domains.flatMap((domain) => domain.projects ?? []);
-    const activeProject =
-      allProjects.find((project) => project.id === desktopProjectId) ??
-      allProjects.find((project) => desktopExplorerNode === `project:${project.id}`) ??
+    const allDecks = desktopMapLibrary.domains.flatMap((domain) => getLibraryDecks(domain));
+    const explorerDeckId = getExplorerDeckId(desktopExplorerNode);
+    const activeDeck =
+      allDecks.find((deck) => deck.id === desktopDeckId) ??
+      allDecks.find((deck) => deck.id === explorerDeckId) ??
       null;
 
-    if (!activeProject?.spots?.some((spot) => spot.id === desktopSelectedSpotId)) {
-      setDesktopSelectedSpotId(activeProject?.spots?.length === 1 ? activeProject.spots[0].id : "");
+    if (!activeDeck?.spots?.some((spot) => spot.id === desktopSelectedSpotId)) {
+      setDesktopSelectedSpotId(activeDeck?.spots?.length === 1 ? activeDeck.spots[0].id : "");
     }
-  }, [desktopMapLibrary, desktopExplorerNode, desktopProjectId, desktopSelectedSpotId]);
+  }, [desktopMapLibrary, desktopExplorerNode, desktopDeckId, desktopSelectedSpotId]);
 
   useEffect(() => {
     if (desktopExplorerNode === "root") {
@@ -831,10 +950,10 @@ function App() {
       return;
     }
 
-    if (desktopExplorerNode.startsWith("project:")) {
-      const targetProjectId = desktopExplorerNode.slice("project:".length);
+    if (getDesktopExplorerType(desktopExplorerNode) === "deck") {
+      const targetDeckId = getExplorerDeckId(desktopExplorerNode);
       const exists = desktopMapLibrary.domains.some((domain) =>
-        (domain.projects ?? []).some((project) => project.id === targetProjectId)
+        getLibraryDecks(domain).some((deck) => deck.id === targetDeckId)
       );
 
       if (!exists) {
@@ -892,12 +1011,12 @@ function App() {
       setDesktopMapLibrary({ rootPath: "", domains: [] });
       setDesktopLibraryError("");
       setDesktopDomainId("");
-      setDesktopProjectId("");
+      setDesktopDeckId("");
       setDesktopSelectedSpotId("");
       setDesktopExplorerNode("root");
       setDesktopSearchQuery("");
       setDesktopExpandedDomains({});
-      setDesktopExpandedProjects({});
+      setDesktopExpandedDecks({});
       setStudioSelection({ type: "deck", id: "" });
       setMapNotice("");
       setMapError("");
@@ -930,12 +1049,12 @@ function App() {
     setDesktopMapLibrary({ rootPath: "", domains: [] });
     setDesktopLibraryError("");
     setDesktopDomainId("");
-    setDesktopProjectId("");
+    setDesktopDeckId("");
     setDesktopSelectedSpotId("");
     setDesktopExplorerNode("root");
     setDesktopSearchQuery("");
     setDesktopExpandedDomains({});
-    setDesktopExpandedProjects({});
+    setDesktopExpandedDecks({});
     setStudioSelection({ type: "deck", id: "" });
     setMapNotice("");
     setMapError("");
@@ -1242,6 +1361,8 @@ function App() {
       return;
     }
 
+    const targetDeckId = target.deckId ?? target.id ?? "";
+
     if (target.type === "domain") {
       setDesktopDomainId(target.id);
       setDesktopSelectedSpotId("");
@@ -1249,10 +1370,10 @@ function App() {
       return;
     }
 
-    if (target.type === "project") {
-      setDesktopProjectId(target.id);
+    if (target.type === "deck") {
+      setDesktopDeckId(target.id);
       setDesktopSelectedSpotId("");
-      setDesktopExplorerNode(`project:${target.id}`);
+      setDesktopExplorerNode(getDeckExplorerNode(target.id));
       return;
     }
 
@@ -1260,9 +1381,9 @@ function App() {
       if (target.domainId) {
         setDesktopDomainId(target.domainId);
       }
-      if (target.projectId) {
-        setDesktopProjectId(target.projectId);
-        setDesktopExplorerNode(`project:${target.projectId}`);
+      if (targetDeckId) {
+        setDesktopDeckId(targetDeckId);
+        setDesktopExplorerNode(getDeckExplorerNode(targetDeckId));
       }
       setDesktopSelectedSpotId(target.id);
     }
@@ -1281,9 +1402,11 @@ function App() {
       setDesktopExplorerNode(`domain:${result.selectedDomainId}`);
     }
 
-    if (result.selectedProjectId) {
-      setDesktopProjectId(result.selectedProjectId);
-      setDesktopExplorerNode(`project:${result.selectedProjectId}`);
+    const selectedDeckId = result.selectedDeckId ?? "";
+
+    if (selectedDeckId) {
+      setDesktopDeckId(selectedDeckId);
+      setDesktopExplorerNode(getDeckExplorerNode(selectedDeckId));
     }
 
     if ("selectedSpotId" in result) {
@@ -1305,7 +1428,7 @@ function App() {
     setAppModal({
       kind: "input",
       caption: "Rename",
-      title: `${target.type === "domain" ? "Domain" : target.type === "project" ? "Deck" : "Spot"} 이름 변경`,
+      title: `${target.type === "domain" ? "Domain" : target.type === "deck" ? "Deck" : "Spot"} 이름 변경`,
       description: `${currentName}의 새 이름을 입력하세요.`,
       inputLabel: "이름",
       initialValue: currentName,
@@ -1336,7 +1459,7 @@ function App() {
             throw new Error(payload?.message || "Domain 이름 변경에 실패했습니다.");
           }
           await loadDesktopMapLibrary();
-        } else if (target.type === "project") {
+        } else if (target.type === "deck") {
           const response = await fetch(`/api/maps/decks/${encodeURIComponent(target.id)}`, {
             method: "PATCH",
             headers: {
@@ -1352,27 +1475,30 @@ function App() {
             throw new Error(payload?.message || "Deck 이름 변경에 실패했습니다.");
           }
           await loadDesktopMapLibrary();
-          setDesktopProjectId(target.id);
-          setDesktopExplorerNode(`project:${target.id}`);
+          setDesktopDeckId(target.id);
+          setDesktopExplorerNode(getDeckExplorerNode(target.id));
         } else if (target.type === "spot") {
-          const response = await fetch(`/api/maps/spots/${encodeURIComponent(target.id)}`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              actorId: session.id,
-              deckId: target.projectId,
-              patch: { name: normalizedName, zoneKey: normalizedName }
-            })
-          });
+          const targetDeckId = target.deckId ?? "";
+          const response = await fetch(
+            `/api/maps/studio/decks/${encodeURIComponent(targetDeckId)}/spots/${encodeURIComponent(target.id)}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                actorId: session.id,
+                patch: { name: normalizedName, zoneKey: normalizedName }
+              })
+            }
+          );
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
             throw new Error(payload?.message || "Spot 이름 변경에 실패했습니다.");
           }
           await loadDesktopMapLibrary();
-          setDesktopProjectId(target.projectId);
-          setDesktopExplorerNode(`project:${target.projectId}`);
+          setDesktopDeckId(targetDeckId);
+          setDesktopExplorerNode(getDeckExplorerNode(targetDeckId));
           setDesktopSelectedSpotId(target.id);
         }
       }
@@ -1385,7 +1511,7 @@ function App() {
     }
 
     const label =
-      target.type === "domain" ? "Domain" : target.type === "project" ? "Deck" : "Spot";
+      target.type === "domain" ? "Domain" : target.type === "deck" ? "Deck" : "Spot";
     setDesktopContextMenu(null);
     setAppModal({
       kind: "confirm",
@@ -1399,7 +1525,7 @@ function App() {
       onConfirm: async () => {
         setDesktopLibraryError("");
 
-        if (target.type === "project") {
+        if (target.type === "deck") {
           const response = await fetch(`/api/maps/decks/${encodeURIComponent(target.id)}`, {
             method: "DELETE",
             headers: {
@@ -1416,16 +1542,19 @@ function App() {
           await loadDesktopMapLibrary();
           setDesktopSelectedSpotId("");
         } else if (target.type === "spot") {
-          const response = await fetch(`/api/maps/spots/${encodeURIComponent(target.id)}`, {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              actorId: session.id,
-              deckId: target.projectId
-            })
-          });
+          const targetDeckId = target.deckId ?? "";
+          const response = await fetch(
+            `/api/maps/studio/decks/${encodeURIComponent(targetDeckId)}/spots/${encodeURIComponent(target.id)}`,
+            {
+              method: "DELETE",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                actorId: session.id
+              })
+            }
+          );
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
             throw new Error(payload?.message || "Spot 삭제에 실패했습니다.");
@@ -1453,14 +1582,14 @@ function App() {
     }
 
     const { target } = desktopContextMenu;
-    const allowDelete = target.type === "project" || target.type === "spot";
+    const allowDelete = target.type === "deck" || target.type === "spot";
     const canOpenStudio =
       desktopBridge?.isDesktop &&
       (
-        target.type === "project" ||
+        target.type === "deck" ||
         target.type === "spot" ||
-        target.type === "project-folder" ||
-        target.type === "project-asset"
+        target.type === "deck-folder" ||
+        target.type === "deck-asset"
       );
     const items = [
       canOpenStudio
@@ -1469,22 +1598,18 @@ function App() {
             label: "스튜디오 열기",
             icon: <BsBoxArrowUpRight aria-hidden="true" />,
             onSelect: () => {
-              if (target.type === "spot" && target.projectId) {
+              const targetDeckId = target.deckId ?? target.id ?? "";
+
+              if (target.type === "spot" && targetDeckId) {
                 desktopBridge.openStudioWindow({
-                  projectId: target.projectId,
+                  deckId: targetDeckId,
                   focusType: "spot",
                   focusId: target.id,
                   actorId: session?.id ?? ""
                 });
-              } else if (target.projectId) {
+              } else if (targetDeckId) {
                 desktopBridge.openStudioWindow({
-                  projectId: target.projectId,
-                  focusType: "deck",
-                  actorId: session?.id ?? ""
-                });
-              } else if (target.id) {
-                desktopBridge.openStudioWindow({
-                  projectId: target.id,
+                  deckId: targetDeckId,
                   focusType: "deck",
                   actorId: session?.id ?? ""
                 });
@@ -1492,7 +1617,7 @@ function App() {
             }
           }
         : null,
-      target.type === "domain" || target.type === "project" || target.type === "spot"
+      target.type === "domain" || target.type === "deck" || target.type === "spot"
         ? {
             key: "rename",
             label: "이름 변경",
@@ -1548,10 +1673,7 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
       setMapNotice(payload.message ?? "Domain 이름을 저장했습니다.");
     } catch (saveError) {
       setMapError(saveError.message);
@@ -1586,10 +1708,7 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
       if (payload.deck?.id) {
         setStudioDeckId(payload.deck.id);
         setStudioSelection({ type: "deck", id: payload.deck.id });
@@ -1628,11 +1747,8 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
-      const nextDeckId = payload.draft?.activeDeckId ?? payload.draft?.decks?.[0]?.id ?? "";
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
+      const nextDeckId = resolveStudioDeckIdFromPayload(payload);
       setStudioDeckId(nextDeckId);
       setStudioSelection({ type: "deck", id: nextDeckId });
       setMapNotice(payload.message ?? "Deck을 삭제했습니다.");
@@ -1649,11 +1765,21 @@ function App() {
     }
 
     const requestMap = {
-      spot: { path: "/api/maps/spots", message: "Spot을 추가했습니다." },
-      nogo: { path: "/api/maps/nogo-zones", message: "금지 구역을 추가했습니다." },
-      dock: { path: "/api/maps/docks", message: "Dock을 추가했습니다.", body: { dock: { kind: "dock" } } },
+      spot: {
+        path: (deckId) => `/api/maps/studio/decks/${encodeURIComponent(deckId)}/spots`,
+        message: "Spot을 추가했습니다."
+      },
+      nogo: {
+        path: (deckId) => `/api/maps/studio/decks/${encodeURIComponent(deckId)}/nogo-zones`,
+        message: "금지 구역을 추가했습니다."
+      },
+      dock: {
+        path: (deckId) => `/api/maps/studio/decks/${encodeURIComponent(deckId)}/docks`,
+        message: "Dock을 추가했습니다.",
+        body: { dock: { kind: "dock" } }
+      },
       portal: {
-        path: "/api/maps/docks",
+        path: (deckId) => `/api/maps/studio/decks/${encodeURIComponent(deckId)}/docks`,
         message: "Portal을 추가했습니다.",
         body: { dock: { kind: "vertical" } }
       }
@@ -1670,7 +1796,7 @@ function App() {
       setMapError("");
       setMapNotice("");
 
-      const response = await fetch(request.path, {
+      const response = await fetch(request.path(studioDeckId), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1688,10 +1814,7 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
       setMapNotice(payload.message ?? request.message);
     } catch (saveError) {
       setMapError(saveError.message);
@@ -1716,20 +1839,19 @@ function App() {
     const deleteConfig =
       targetSelection.type === "spot"
         ? {
-            path: `/api/maps/spots/${encodeURIComponent(targetSelection.id)}`,
-            body: { actorId: session.id, deckId: targetDeckId }
+            path: `/api/maps/studio/decks/${encodeURIComponent(targetDeckId)}/spots/${encodeURIComponent(targetSelection.id)}`,
+            body: { actorId: session.id }
           }
         : targetSelection.type === "nogo"
           ? {
-              path: `/api/maps/nogo-zones/${encodeURIComponent(targetSelection.id)}`,
-              body: { actorId: session.id, deckId: targetDeckId }
+              path: `/api/maps/studio/decks/${encodeURIComponent(targetDeckId)}/nogo-zones/${encodeURIComponent(targetSelection.id)}`,
+              body: { actorId: session.id }
             }
           : targetSelection.type === "dock"
             ? {
-                path: `/api/maps/docks/${encodeURIComponent(targetSelection.id)}`,
+                path: `/api/maps/studio/decks/${encodeURIComponent(targetDeckId)}/docks/${encodeURIComponent(targetSelection.id)}`,
                 body: {
                   actorId: session.id,
-                  deckId: targetDeckId,
                   kind: currentDock?.kind === "vertical" ? "vertical" : "dock"
                 }
               }
@@ -1763,15 +1885,11 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
-      const nextDeckId =
-        payload.draft?.activeDeckId ??
-        targetDeckId ??
-        payload.draft?.decks?.[0]?.id ??
-        "";
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
+      const nextDeckId = resolveStudioDeckIdFromPayload(
+        payload,
+        targetSelection.type === "deck" ? "" : targetDeckId
+      );
       setStudioDeckId(nextDeckId);
       setStudioSelection({ type: "deck", id: nextDeckId });
       setMapNotice(payload.message ?? "선택 항목을 삭제했습니다.");
@@ -1798,14 +1916,13 @@ function App() {
       setMapError("");
       setMapNotice("");
 
-      const response = await fetch("/api/maps/studio", {
+      const response = await fetch(`/api/maps/studio/decks/${encodeURIComponent(studioDeckId)}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           actorId: session.id,
-          deckId: studioDeckId,
           patch: {
             label: targetDeck.label,
             name: targetDeck.name,
@@ -1825,10 +1942,7 @@ function App() {
       }
 
       const payload = await response.json();
-      setStudioBundle((current) => ({
-        ...current,
-        draft: payload.draft ?? current.draft
-      }));
+      setStudioBundle((current) => mergeStudioBundlePayload(current, payload));
       setMapNotice(payload.message ?? "맵 초안을 저장했습니다.");
     } catch (saveError) {
       setMapError(saveError.message);
@@ -2550,59 +2664,48 @@ function App() {
       const desktopDomains = desktopMapLibrary.domains ?? [];
       const defaultDomain =
         desktopDomains.find((domain) => domain.id === desktopDomainId) ?? desktopDomains[0] ?? null;
-      const allProjects = desktopDomains.flatMap((domain) => domain.projects ?? []);
-      const explorerType = desktopExplorerNode.startsWith("spot:")
-        ? "spot"
-        : desktopExplorerNode.startsWith("project:")
-        ? "project"
-        : desktopExplorerNode.startsWith("domain:")
-          ? "domain"
-          : "root";
+      const allDecks = desktopDomains.flatMap((domain) => getLibraryDecks(domain));
+      const explorerType = getDesktopExplorerType(desktopExplorerNode);
       const explorerDomainId =
         explorerType === "domain" ? desktopExplorerNode.slice("domain:".length) : "";
-      const explorerProjectId =
-        explorerType === "project"
-          ? desktopExplorerNode.slice("project:".length)
-          : explorerType === "spot"
-            ? desktopExplorerNode.split(":")[1] ?? ""
-            : "";
-      const explorerSpotId = explorerType === "spot" ? desktopExplorerNode.split(":")[2] ?? "" : "";
+      const explorerDeckId = getExplorerDeckId(desktopExplorerNode);
+      const explorerSpotId = getExplorerSpotId(desktopExplorerNode);
       const explorerDomain =
         explorerType === "domain"
           ? desktopDomains.find((domain) => domain.id === explorerDomainId) ?? defaultDomain
-          : explorerType === "project" || explorerType === "spot"
+          : explorerType === "deck" || explorerType === "spot"
             ? desktopDomains.find((domain) =>
-                (domain.projects ?? []).some((project) => project.id === explorerProjectId)
+                getLibraryDecks(domain).some((deck) => deck.id === explorerDeckId)
               ) ?? defaultDomain
             : defaultDomain;
-      const explorerProjects = explorerDomain?.projects ?? [];
-      const explorerProject =
-        explorerType === "project" || explorerType === "spot"
-          ? allProjects.find((project) => project.id === explorerProjectId) ?? null
+      const explorerDecks = getLibraryDecks(explorerDomain);
+      const explorerDeck =
+        explorerType === "deck" || explorerType === "spot"
+          ? allDecks.find((deck) => deck.id === explorerDeckId) ?? null
           : null;
-      const selectedDesktopProject =
-        explorerProject ??
-        explorerProjects.find((project) => project.id === desktopProjectId) ??
-        explorerProjects[0] ??
+      const selectedDesktopDeck =
+        explorerDeck ??
+        explorerDecks.find((deck) => deck.id === desktopDeckId) ??
+        explorerDecks[0] ??
         null;
       const selectedDesktopSpot =
         (explorerType === "spot"
-          ? selectedDesktopProject?.spots?.find((spot) => spot.id === explorerSpotId) ?? null
+          ? selectedDesktopDeck?.spots?.find((spot) => spot.id === explorerSpotId) ?? null
           : null) ??
-        selectedDesktopProject?.spots?.find((spot) => spot.id === desktopSelectedSpotId) ??
-        (selectedDesktopProject?.spots?.length === 1 ? selectedDesktopProject.spots[0] : null);
+        selectedDesktopDeck?.spots?.find((spot) => spot.id === desktopSelectedSpotId) ??
+        (selectedDesktopDeck?.spots?.length === 1 ? selectedDesktopDeck.spots[0] : null);
       const allSpots = desktopDomains.flatMap((domain) =>
-        (domain.projects ?? []).flatMap((project) =>
-          (project.spots ?? []).map((spot) => ({
+        getLibraryDecks(domain).flatMap((deck) =>
+          (deck.spots ?? []).map((spot) => ({
             ...spot,
-            projectId: project.id,
-            projectName: project.displayName ?? project.folderName,
+            deckId: deck.id,
+            deckName: deck.displayName ?? deck.folderName,
             domainId: domain.id,
             domainName: domain.name
           }))
         )
       );
-      const selectedDomainPortalLinks = explorerProjects.flatMap((project) => project.portalLinks ?? []);
+      const selectedDomainPortalLinks = explorerDecks.flatMap((deck) => deck.portalLinks ?? []);
       const normalizedQuery = desktopSearchQuery.trim().toLowerCase();
       const hasSearchQuery = normalizedQuery.length > 0;
       const matchesQuery = (value) => String(value ?? "").toLowerCase().includes(normalizedQuery);
@@ -2618,20 +2721,21 @@ function App() {
         desktopSearchScope === "domain"
           ? desktopDomains.filter((domain) => matchesQuery(domain.name)).length
           : desktopSearchScope === "deck"
-            ? allProjects.filter((project) => matchesQuery(project.displayName ?? project.folderName)).length
+            ? allDecks.filter((deck) => matchesQuery(deck.displayName ?? deck.folderName)).length
             : allSpots.filter((spot) => matchesQuery(spot.name)).length;
       const folderTitle = hasSearchQuery
         ? `${searchScopeLabel} Search`
         : explorerType === "spot"
           ? selectedDesktopSpot?.name ?? "Spot"
-          : explorerType === "project"
-            ? selectedDesktopProject?.displayName ?? selectedDesktopProject?.folderName ?? "Deck"
+          : explorerType === "deck"
+            ? selectedDesktopDeck?.displayName ?? selectedDesktopDeck?.folderName ?? "Deck"
             : explorerType === "domain"
               ? explorerDomain?.name ?? "Domain"
               : "Map Library";
-      const domainStudioProject = explorerProjects[0] ?? selectedDesktopProject ?? null;
+      const domainStudioDeck = explorerDecks[0] ?? selectedDesktopDeck ?? null;
 
       function renderDomainCard(domain) {
+        const domainDecks = getLibraryDecks(domain);
         return (
           <div
             key={domain.id}
@@ -2657,22 +2761,22 @@ function App() {
                 <MacFolderIcon size="lg" />
               </span>
               <strong>{domain.name}</strong>
-              <small>{domain.projects.length} decks</small>
+              <small>{domainDecks.length} decks</small>
             </button>
           </div>
         );
       }
 
-      function renderProjectCard(project, domainId = explorerDomain?.id ?? "") {
+      function renderDeckCard(deck, domainId = explorerDomain?.id ?? "") {
         return (
           <div
-            key={project.id}
+            key={deck.id}
             className="folder-card-shell"
             onContextMenu={(event) =>
               openDesktopContextMenu(event, {
-                type: "project",
-                id: project.id,
-                name: project.displayName ?? project.folderName,
+                type: "deck",
+                id: deck.id,
+                name: deck.displayName ?? deck.folderName,
                 domainId
               })
             }
@@ -2682,32 +2786,32 @@ function App() {
               className="folder-card folder-card-folder"
               onClick={() => {
                 setDesktopDomainId(domainId);
-                setDesktopProjectId(project.id);
-                setDesktopSelectedSpotId(project.spots?.length === 1 ? project.spots[0].id : "");
-                setDesktopExplorerNode(`project:${project.id}`);
+                setDesktopDeckId(deck.id);
+                setDesktopSelectedSpotId(deck.spots?.length === 1 ? deck.spots[0].id : "");
+                setDesktopExplorerNode(getDeckExplorerNode(deck.id));
               }}
             >
               <span className="folder-card-icon">
                 <MacFolderIcon size="lg" />
               </span>
-              <strong>{project.displayName ?? project.folderName}</strong>
-              <small>{project.spots?.length ?? 0} spots</small>
+              <strong>{deck.displayName ?? deck.folderName}</strong>
+              <small>{deck.spots?.length ?? 0} spots</small>
             </button>
           </div>
         );
       }
 
-      function renderSpotCard(spot, projectId = selectedDesktopProject?.id ?? "", domainId = explorerDomain?.id ?? "") {
+      function renderSpotCard(spot, deckId = selectedDesktopDeck?.id ?? "", domainId = explorerDomain?.id ?? "") {
         return (
           <div
-            key={`${projectId}-${spot.id}`}
+            key={`${deckId}-${spot.id}`}
             className="folder-card-shell"
             onContextMenu={(event) =>
               openDesktopContextMenu(event, {
                 type: "spot",
                 id: spot.id,
                 name: spot.name,
-                projectId,
+                deckId,
                 domainId
               })
             }
@@ -2716,14 +2820,14 @@ function App() {
               type="button"
               className="folder-card folder-card-folder"
               onClick={() => {
-                if (!projectId) {
+                if (!deckId) {
                   return;
                 }
 
                 setDesktopDomainId(domainId);
-                setDesktopProjectId(projectId);
+                setDesktopDeckId(deckId);
                 setDesktopSelectedSpotId(spot.id);
-                setDesktopExplorerNode(`spot:${projectId}:${spot.id}`);
+                setDesktopExplorerNode(getSpotExplorerNode(deckId, spot.id));
               }}
             >
               <span className="folder-card-icon">
@@ -2746,15 +2850,15 @@ function App() {
 
           if (desktopSearchScope === "deck") {
             return desktopDomains.flatMap((domain) =>
-              (domain.projects ?? [])
-                .filter((project) => matchesQuery(project.displayName ?? project.folderName))
-                .map((project) => renderProjectCard(project, domain.id))
+              getLibraryDecks(domain)
+                .filter((deck) => matchesQuery(deck.displayName ?? deck.folderName))
+                .map((deck) => renderDeckCard(deck, domain.id))
             );
           }
 
           return allSpots
             .filter((spot) => matchesQuery(spot.name))
-            .map((spot) => renderSpotCard(spot, spot.projectId, spot.domainId));
+            .map((spot) => renderSpotCard(spot, spot.deckId, spot.domainId));
         }
 
         if (explorerType === "root") {
@@ -2762,12 +2866,12 @@ function App() {
         }
 
         if (explorerType === "domain") {
-          return explorerProjects.map((project) => renderProjectCard(project, explorerDomain?.id ?? ""));
+          return explorerDecks.map((deck) => renderDeckCard(deck, explorerDomain?.id ?? ""));
         }
 
-        if (explorerType === "project") {
-          return (selectedDesktopProject?.spots ?? []).map((spot) =>
-            renderSpotCard(spot, selectedDesktopProject?.id ?? "", explorerDomain?.id ?? "")
+        if (explorerType === "deck") {
+          return (selectedDesktopDeck?.spots ?? []).map((spot) =>
+            renderSpotCard(spot, selectedDesktopDeck?.id ?? "", explorerDomain?.id ?? "")
           );
         }
 
@@ -2858,8 +2962,8 @@ function App() {
                     await loadDesktopMapLibrary();
                     const nextDeckId = payload.deck?.id ?? "";
                     if (nextDeckId) {
-                      setDesktopProjectId(nextDeckId);
-                      setDesktopExplorerNode(`project:${nextDeckId}`);
+                      setDesktopDeckId(nextDeckId);
+                      setDesktopExplorerNode(getDeckExplorerNode(nextDeckId));
                     }
                   } catch (desktopError) {
                     setDesktopLibraryError(desktopError.message || "새 Deck 생성에 실패했습니다.");
@@ -2872,26 +2976,28 @@ function App() {
               </button>
             ) : null}
 
-            {explorerType === "project" ? (
+            {explorerType === "deck" ? (
               <button
                 type="button"
                 className="ghost-button explorer-toolbar-button"
                 onClick={async () => {
-                  if (!session || session.role !== "root" || !selectedDesktopProject) {
+                  if (!session || session.role !== "root" || !selectedDesktopDeck) {
                     return;
                   }
 
                   try {
-                    const response = await fetch("/api/maps/spots", {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json"
-                      },
-                      body: JSON.stringify({
-                        actorId: session.id,
-                        deckId: selectedDesktopProject.id
-                      })
-                    });
+                    const response = await fetch(
+                      `/api/maps/studio/decks/${encodeURIComponent(selectedDesktopDeck.id)}/spots`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                          actorId: session.id
+                        })
+                      }
+                    );
 
                     if (!response.ok) {
                       const payload = await response.json().catch(() => null);
@@ -2903,13 +3009,13 @@ function App() {
                     const nextSpotId = payload.spot?.id ?? "";
                     if (nextSpotId) {
                       setDesktopSelectedSpotId(nextSpotId);
-                      setDesktopExplorerNode(`spot:${nextSpotId}`);
+                      setDesktopExplorerNode(getSpotExplorerNode(selectedDesktopDeck.id, nextSpotId));
                     }
                   } catch (desktopError) {
                     setDesktopLibraryError(desktopError.message || "새 Spot 생성에 실패했습니다.");
                   }
                 }}
-                disabled={session.role !== "root" || !selectedDesktopProject}
+                disabled={session.role !== "root" || !selectedDesktopDeck}
               >
                 <BsGeoAltFill aria-hidden="true" />
                 <span>새 Spot</span>
@@ -2923,24 +3029,24 @@ function App() {
               selection={{
                 explorerType,
                 explorerDomainId: explorerDomain?.id ?? "",
-                explorerProjectId: selectedDesktopProject?.id ?? "",
+                explorerDeckId: selectedDesktopDeck?.id ?? "",
                 explorerSpotId: selectedDesktopSpot?.id ?? "",
                 activeDomainId: desktopDomainId
               }}
               query={desktopSearchQuery}
               searchScope={desktopSearchScope}
               expandedDomains={desktopExpandedDomains}
-              expandedProjects={desktopExpandedProjects}
+              expandedDecks={desktopExpandedDecks}
               onToggleDomain={(domainId, nextIsOpen) =>
                 setDesktopExpandedDomains((current) => ({
                   ...current,
                   [domainId]: nextIsOpen
                 }))
               }
-              onToggleProject={(projectId, nextIsOpen) =>
-                setDesktopExpandedProjects((current) => ({
+              onToggleDeck={(deckId, nextIsOpen) =>
+                setDesktopExpandedDecks((current) => ({
                   ...current,
-                  [projectId]: nextIsOpen
+                  [deckId]: nextIsOpen
                 }))
               }
               onSelectRoot={() => {
@@ -2952,17 +3058,17 @@ function App() {
                 setDesktopSelectedSpotId("");
                 setDesktopExplorerNode(`domain:${domainId}`);
               }}
-              onSelectProject={(domainId, project) => {
+              onSelectDeck={(domainId, deck) => {
                 setDesktopDomainId(domainId);
-                setDesktopProjectId(project.id);
-                setDesktopSelectedSpotId(project.spots?.length === 1 ? project.spots[0].id : "");
-                setDesktopExplorerNode(`project:${project.id}`);
+                setDesktopDeckId(deck.id);
+                setDesktopSelectedSpotId(deck.spots?.length === 1 ? deck.spots[0].id : "");
+                setDesktopExplorerNode(getDeckExplorerNode(deck.id));
               }}
-              onSelectSpot={(domainId, projectId, spotId) => {
+              onSelectSpot={(domainId, deckId, spotId) => {
                 setDesktopDomainId(domainId);
-                setDesktopProjectId(projectId);
+                setDesktopDeckId(deckId);
                 setDesktopSelectedSpotId(spotId);
-                setDesktopExplorerNode(`spot:${projectId}:${spotId}`);
+                setDesktopExplorerNode(getSpotExplorerNode(deckId, spotId));
               }}
               onContextMenu={openDesktopContextMenu}
             />
@@ -2984,10 +3090,10 @@ function App() {
                   <h3>Server Library</h3>
                   <div className="detail-grid">
                     <DetailItem label="Domains" value={desktopDomains.length} />
-                    <DetailItem label="Projects" value={allProjects.length} />
+                    <DetailItem label="Decks" value={allDecks.length} />
                     <DetailItem
                       label="Spots"
-                      value={allProjects.reduce((count, project) => count + (project.spots?.length ?? 0), 0)}
+                      value={allDecks.reduce((count, deck) => count + (deck.spots?.length ?? 0), 0)}
                     />
                     <DetailItem label="Mode" value="Server Sync" />
                   </div>
@@ -2996,30 +3102,30 @@ function App() {
                 <>
                   <h3>{explorerDomain?.name ?? "Domain"}</h3>
                   <div className="detail-grid">
-                    <DetailItem label="Folders" value={explorerProjects.length} />
+                    <DetailItem label="Decks" value={explorerDecks.length} />
                     <DetailItem label="Portals" value={selectedDomainPortalLinks.length} />
                     <DetailItem
                       label="Spots"
-                      value={explorerProjects.reduce((count, project) => count + (project.spots?.length ?? 0), 0)}
+                      value={explorerDecks.reduce((count, deck) => count + (deck.spots?.length ?? 0), 0)}
                     />
                     <DetailItem label="Scope" value="Domain Workspace" />
                   </div>
                   <div className="studio-asset-group">
                     <span className="studio-library-label">Domain Summary</span>
                     <div className="studio-asset-list">
-                      {explorerProjects.length ? (
-                        explorerProjects.slice(0, 6).map((project) => (
+                      {explorerDecks.length ? (
+                        explorerDecks.slice(0, 6).map((deck) => (
                           <button
-                            key={project.id}
+                            key={deck.id}
                             type="button"
                             className="studio-asset-item"
                             onClick={() => {
-                              setDesktopProjectId(project.id);
-                              setDesktopExplorerNode(`project:${project.id}`);
+                              setDesktopDeckId(deck.id);
+                              setDesktopExplorerNode(getDeckExplorerNode(deck.id));
                             }}
                           >
-                            <strong>{project.displayName ?? project.folderName}</strong>
-                            <small>{project.spots?.length ?? 0} spots</small>
+                            <strong>{deck.displayName ?? deck.folderName}</strong>
+                            <small>{deck.spots?.length ?? 0} spots</small>
                           </button>
                         ))
                       ) : (
@@ -3031,43 +3137,43 @@ function App() {
                     type="button"
                     className="primary-button"
                     onClick={() => {
-                      if (domainStudioProject) {
+                      if (domainStudioDeck) {
                         desktopBridge.openStudioWindow({
-                          projectId: domainStudioProject.id,
+                          deckId: domainStudioDeck.id,
                           focusType: "domain",
                           focusId: explorerDomain?.id ?? "",
                           actorId: session?.id ?? ""
                         });
                       }
                     }}
-                    disabled={!domainStudioProject}
+                    disabled={!domainStudioDeck}
                   >
                     Domain 스튜디오
                   </button>
                 </>
-              ) : explorerType === "project" ? (
+              ) : explorerType === "deck" ? (
                 <>
-                  <h3>{selectedDesktopProject?.displayName ?? selectedDesktopProject?.folderName ?? "Deck"}</h3>
+                  <h3>{selectedDesktopDeck?.displayName ?? selectedDesktopDeck?.folderName ?? "Deck"}</h3>
                   <div className="detail-grid">
-                    <DetailItem label="Version" value={selectedDesktopProject?.version ?? "-"} />
-                    <DetailItem label="Status" value={selectedDesktopProject?.status ?? "-"} />
-                    <DetailItem label="Spots" value={selectedDesktopProject?.spots?.length ?? 0} />
-                    <DetailItem label="Portals" value={selectedDesktopProject?.portalLinks?.length ?? 0} />
+                    <DetailItem label="Version" value={selectedDesktopDeck?.version ?? "-"} />
+                    <DetailItem label="Status" value={selectedDesktopDeck?.status ?? "-"} />
+                    <DetailItem label="Spots" value={selectedDesktopDeck?.spots?.length ?? 0} />
+                    <DetailItem label="Portals" value={selectedDesktopDeck?.portalLinks?.length ?? 0} />
                   </div>
 
                   <div className="studio-asset-group">
                     <span className="studio-library-label">Portal Links</span>
                     <div className="studio-asset-list">
-                      {selectedDesktopProject?.portalLinks?.length ? (
-                        selectedDesktopProject.portalLinks.map((link) => (
+                      {selectedDesktopDeck?.portalLinks?.length ? (
+                        selectedDesktopDeck.portalLinks.map((link) => (
                           <button
                             key={link.id}
                             type="button"
                             className="studio-asset-item"
                             onClick={() => {
-                              if (link.targetProjectId) {
-                                setDesktopProjectId(link.targetProjectId);
-                                setDesktopExplorerNode(`project:${link.targetProjectId}`);
+                              if (link.targetDeckId) {
+                                setDesktopDeckId(link.targetDeckId);
+                                setDesktopExplorerNode(getDeckExplorerNode(link.targetDeckId));
                               }
                             }}
                           >
@@ -3085,15 +3191,15 @@ function App() {
                     type="button"
                     className="primary-button"
                     onClick={() => {
-                      if (selectedDesktopProject) {
+                      if (selectedDesktopDeck) {
                         desktopBridge.openStudioWindow({
-                          projectId: selectedDesktopProject.id,
+                          deckId: selectedDesktopDeck.id,
                           focusType: "deck",
                           actorId: session?.id ?? ""
                         });
                       }
                     }}
-                    disabled={!selectedDesktopProject}
+                    disabled={!selectedDesktopDeck}
                   >
                     Deck 스튜디오
                   </button>
@@ -3102,7 +3208,7 @@ function App() {
                 <>
                   <h3>{selectedDesktopSpot?.name ?? "Spot"}</h3>
                   <div className="detail-grid">
-                    <DetailItem label="Deck" value={selectedDesktopProject?.displayName ?? "-"} />
+                    <DetailItem label="Deck" value={selectedDesktopDeck?.displayName ?? "-"} />
                     <DetailItem label="Kind" value="Spot" />
                     <DetailItem
                       label="Frame"
@@ -3145,16 +3251,16 @@ function App() {
                     type="button"
                     className="primary-button"
                     onClick={() => {
-                      if (selectedDesktopProject && selectedDesktopSpot) {
+                      if (selectedDesktopDeck && selectedDesktopSpot) {
                         desktopBridge.openStudioWindow({
-                          projectId: selectedDesktopProject.id,
+                          deckId: selectedDesktopDeck.id,
                           focusType: "spot",
                           focusId: selectedDesktopSpot.id,
                           actorId: session?.id ?? ""
                         });
                       }
                     }}
-                    disabled={!selectedDesktopProject || !selectedDesktopSpot}
+                    disabled={!selectedDesktopDeck || !selectedDesktopSpot}
                   >
                     Spot 스튜디오
                   </button>
@@ -3391,7 +3497,7 @@ function App() {
                   <article className="studio-file-card">
                     <span className="studio-file-extension">PUB</span>
                     <strong>{selectedDeckFileName.replace(".map", ".published")}</strong>
-                    <small>배포 버전 {studioBundle.published?.version ?? "-"}</small>
+                    <small>배포 버전 {publishedMap?.version ?? "-"}</small>
                     <span className="studio-file-meta">관제 반영 기준본</span>
                   </article>
                 </div>
@@ -3915,7 +4021,7 @@ function App() {
             <div className="map-overview compact-meta-list">
               <span>선택 항목 {studioInspectorMeta}</span>
               <span>초안 버전 {studioDraft?.version ?? "-"}</span>
-              <span>배포 버전 {studioBundle.published?.version ?? "-"}</span>
+              <span>배포 버전 {publishedMap?.version ?? "-"}</span>
             </div>
 
             {effectiveSpot ? (
@@ -5166,25 +5272,25 @@ function NodeGraphBoard({ teams, accounts, canEdit, onMoveNode }) {
   );
 }
 
-function MapTopologyGraph({ domainName, projects, selectedProjectId, links, onSelectProject }) {
+function MapTopologyGraph({ domainName, decks, selectedDeckId, links, onSelectDeck }) {
   const width = 100;
   const height = 100;
   const rootNode = { x: 50, y: 16 };
-  const projectNodes = projects.map((project, index) => {
-    const ratio = projects.length === 1 ? 0.5 : index / (projects.length - 1);
+  const deckNodes = decks.map((deck, index) => {
+    const ratio = decks.length === 1 ? 0.5 : index / (decks.length - 1);
 
     return {
-      ...project,
+      ...deck,
       x: 14 + ratio * 72,
       y: 78
     };
   });
-  const nodeMap = new Map(projectNodes.map((node) => [node.id, node]));
+  const nodeMap = new Map(deckNodes.map((node) => [node.id, node]));
 
   return (
     <div className="map-topology-shell">
       <svg className="map-topology-canvas" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-        {projectNodes.map((node) => (
+        {deckNodes.map((node) => (
           <line
             key={`root-${node.id}`}
             x1={rootNode.x}
@@ -5196,8 +5302,8 @@ function MapTopologyGraph({ domainName, projects, selectedProjectId, links, onSe
         ))}
 
         {links.map((link) => {
-          const source = nodeMap.get(link.sourceProjectId);
-          const target = nodeMap.get(link.targetProjectId);
+          const source = nodeMap.get(link.sourceDeckId);
+          const target = nodeMap.get(link.targetDeckId);
 
           if (!source || !target) {
             return null;
@@ -5219,13 +5325,13 @@ function MapTopologyGraph({ domainName, projects, selectedProjectId, links, onSe
         <small>root domain</small>
       </div>
 
-      {projectNodes.map((node) => (
+      {deckNodes.map((node) => (
         <button
           key={node.id}
           type="button"
-          className={`map-topology-node ${node.id === selectedProjectId ? "is-selected" : ""}`}
+          className={`map-topology-node ${node.id === selectedDeckId ? "is-selected" : ""}`}
           style={{ left: `${node.x}%`, top: `${node.y}%` }}
-          onClick={() => onSelectProject(node.id)}
+          onClick={() => onSelectDeck(node.id)}
         >
           <span className="map-topology-node-badge">{node.label}</span>
           <strong>{node.folderName}</strong>

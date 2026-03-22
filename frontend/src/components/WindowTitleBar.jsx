@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ActionModal from "./ActionModal";
 
 function getDesktopBridge() {
   if (typeof window === "undefined") {
@@ -46,6 +47,20 @@ export default function WindowTitleBar({ title = "HAECHI Control Center" }) {
     return null;
   }
 
+  const closeConfirmModal = isCloseConfirmOpen
+    ? {
+        caption: "Window",
+        title: "종료하시겠습니까?",
+        description: "확인을 누르면 현재 창이 종료됩니다.",
+        kind: "confirm",
+        tone: "danger",
+        confirmText: "종료",
+        onConfirm: async () => {
+          await desktopBridge.closeWindow?.();
+        }
+      }
+    : null;
+
   return (
     <>
       <header className="window-titlebar">
@@ -85,41 +100,7 @@ export default function WindowTitleBar({ title = "HAECHI Control Center" }) {
           </button>
         </div>
       </header>
-
-      {isCloseConfirmOpen ? (
-        <div className="app-modal-backdrop" onMouseDown={() => setIsCloseConfirmOpen(false)}>
-          <div className="app-modal window-close-modal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="app-modal-head">
-              <div>
-                <p className="section-label" lang="en">
-                  Window
-                </p>
-                <h2>종료하시겠습니까?</h2>
-              </div>
-            </div>
-            <p className="app-modal-copy">확인을 누르면 현재 창이 종료됩니다.</p>
-            <div className="app-modal-actions">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => setIsCloseConfirmOpen(false)}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="primary-button danger-button"
-                onClick={() => {
-                  setIsCloseConfirmOpen(false);
-                  desktopBridge.closeWindow?.();
-                }}
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ActionModal modal={closeConfirmModal} onClose={() => setIsCloseConfirmOpen(false)} />
     </>
   );
 }

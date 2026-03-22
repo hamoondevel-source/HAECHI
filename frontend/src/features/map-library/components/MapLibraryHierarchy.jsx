@@ -28,18 +28,22 @@ function formatSpotSize(spot) {
   return `${width} x ${height}`;
 }
 
+function getDomainDecks(domain) {
+  return domain?.decks ?? domain?.projects ?? [];
+}
+
 export default function MapLibraryHierarchy({
   domains,
   selection,
   query = "",
   searchScope = "domain",
   expandedDomains,
-  expandedProjects,
+  expandedDecks,
   onToggleDomain,
-  onToggleProject,
+  onToggleDeck,
   onSelectRoot,
   onSelectDomain,
-  onSelectProject,
+  onSelectDeck,
   onSelectSpot,
   onContextMenu
 }) {
@@ -49,15 +53,15 @@ export default function MapLibraryHierarchy({
   const matchesSearch = (value) => String(value ?? "").toLowerCase().includes(normalizedQuery);
   const filteredDomainList = domainList
     .map((domain) => {
-      const projects = domain.projects ?? [];
+      const decks = getDomainDecks(domain);
       const domainMatches = hasSearchQuery && searchScope === "domain" && matchesSearch(domain.name);
-      const filteredProjects = projects
-        .map((project) => {
-          const projectSpots = project.spots ?? [];
-          const projectLabel = project.displayName ?? project.folderName;
-          const projectMatches = hasSearchQuery && searchScope === "deck" && matchesSearch(projectLabel);
-          const filteredSpots = projectSpots.filter((spot) => {
-            if (!hasSearchQuery || domainMatches || projectMatches) {
+      const filteredDecks = decks
+        .map((deck) => {
+          const deckSpots = deck.spots ?? [];
+          const deckLabel = deck.displayName ?? deck.folderName;
+          const deckMatches = hasSearchQuery && searchScope === "deck" && matchesSearch(deckLabel);
+          const filteredSpots = deckSpots.filter((spot) => {
+            if (!hasSearchQuery || domainMatches || deckMatches) {
               return true;
             }
 
@@ -65,17 +69,18 @@ export default function MapLibraryHierarchy({
           });
 
           return {
-            ...project,
-            projectSpots: filteredSpots,
-            isVisible: !hasSearchQuery || domainMatches || projectMatches || filteredSpots.length > 0
+            ...deck,
+            deckSpots: filteredSpots,
+            isVisible: !hasSearchQuery || domainMatches || deckMatches || filteredSpots.length > 0
           };
         })
-        .filter((project) => project.isVisible);
+        .filter((deck) => deck.isVisible);
 
       return {
         ...domain,
-        projects: filteredProjects,
-        isVisible: !hasSearchQuery || domainMatches || filteredProjects.length > 0
+        decks: filteredDecks,
+        projects: filteredDecks,
+        isVisible: !hasSearchQuery || domainMatches || filteredDecks.length > 0
       };
     })
     .filter((domain) => domain.isVisible);
@@ -102,19 +107,19 @@ export default function MapLibraryHierarchy({
         <div className="unity-tree-children">
           {hasDomains ? (
             filteredDomainList.map((domain) => {
-              const projects = domain.projects ?? [];
+              const decks = getDomainDecks(domain);
               const isDomainOpen =
                 expandedDomains[domain.id] ??
                 (selection.explorerType === "domain"
                   ? selection.explorerDomainId === domain.id
-                  : selection.explorerType === "project" || selection.explorerType === "spot"
+                  : selection.explorerType === "deck" || selection.explorerType === "spot"
                     ? selection.explorerDomainId === domain.id
                     : selection.activeDomainId === domain.id);
               const isDomainSelected =
                 selection.explorerType === "domain" && selection.explorerDomainId === domain.id;
               const isDomainDescendantFocused =
                 !isDomainSelected &&
-                (selection.explorerType === "project" || selection.explorerType === "spot") &&
+                (selection.explorerType === "deck" || selection.explorerType === "spot") &&
                 selection.explorerDomainId === domain.id;
 
               return (
@@ -125,14 +130,14 @@ export default function MapLibraryHierarchy({
                     icon={<MapLibraryNodeIcon kind="domain" />}
                     meta={
                       <MapLibraryTreeMeta
-                        detail={`${projects.length} decks`}
+                        detail={`${decks.length} decks`}
                         badgeLabel="Domain"
                         badgeClassName="kind-domain"
                       />
                     }
                     selected={isDomainSelected}
                     descendantFocused={isDomainDescendantFocused}
-                    collapsible={projects.length > 0}
+                    collapsible={decks.length > 0}
                     isOpen={isDomainOpen}
                     onToggle={() => onToggleDomain(domain.id, !isDomainOpen)}
                     onClick={() => onSelectDomain(domain.id)}
@@ -147,56 +152,56 @@ export default function MapLibraryHierarchy({
 
                   {isDomainOpen ? (
                     <div className="unity-tree-children">
-                      {projects.length ? (
-                        projects.map((project) => {
-                          const projectSpots = project.spots ?? [];
-                          const isProjectOpen =
-                            expandedProjects[project.id] ??
-                            ((selection.explorerType === "project" || selection.explorerType === "spot") &&
-                              selection.explorerProjectId === project.id);
-                          const isProjectSelected =
-                            selection.explorerType === "project" && selection.explorerProjectId === project.id;
-                          const isProjectDescendantFocused =
-                            !isProjectSelected &&
+                      {decks.length ? (
+                        decks.map((deck) => {
+                          const deckSpots = deck.deckSpots ?? deck.spots ?? [];
+                          const isDeckOpen =
+                            expandedDecks[deck.id] ??
+                            ((selection.explorerType === "deck" || selection.explorerType === "spot") &&
+                              selection.explorerDeckId === deck.id);
+                          const isDeckSelected =
+                            selection.explorerType === "deck" && selection.explorerDeckId === deck.id;
+                          const isDeckDescendantFocused =
+                            !isDeckSelected &&
                             selection.explorerType === "spot" &&
-                            selection.explorerProjectId === project.id;
+                            selection.explorerDeckId === deck.id;
 
                           return (
-                            <div key={project.id} className="unity-tree-children">
+                            <div key={deck.id} className="unity-tree-children">
                               <TreeRow
                                 depth={2}
-                                label={project.displayName ?? project.folderName}
+                                label={deck.displayName ?? deck.folderName}
                                 icon={<MapLibraryNodeIcon kind="deck" />}
                                 meta={
                                   <MapLibraryTreeMeta
-                                    detail={`${projectSpots.length} spots`}
+                                    detail={`${deckSpots.length} spots`}
                                     badgeLabel="Deck"
                                     badgeClassName="kind-deck"
                                   />
                                 }
-                                selected={isProjectSelected}
-                                descendantFocused={isProjectDescendantFocused}
-                                collapsible={projectSpots.length > 0}
-                                isOpen={isProjectOpen}
-                                onToggle={() => onToggleProject(project.id, !isProjectOpen)}
-                                onClick={() => onSelectProject(domain.id, project)}
+                                selected={isDeckSelected}
+                                descendantFocused={isDeckDescendantFocused}
+                                collapsible={deckSpots.length > 0}
+                                isOpen={isDeckOpen}
+                                onToggle={() => onToggleDeck(deck.id, !isDeckOpen)}
+                                onClick={() => onSelectDeck(domain.id, deck)}
                                 onContextMenu={(event) =>
                                   onContextMenu(event, {
-                                    type: "project",
-                                    id: project.id,
-                                    name: project.displayName ?? project.folderName,
+                                    type: "deck",
+                                    id: deck.id,
+                                    name: deck.displayName ?? deck.folderName,
                                     domainId: domain.id
                                   })
                                 }
                               />
 
-                              {isProjectOpen ? (
+                              {isDeckOpen ? (
                                 <div className="unity-tree-children">
-                                  {projectSpots.length ? (
-                                    projectSpots.map((spot) => {
+                                  {deckSpots.length ? (
+                                    deckSpots.map((spot) => {
                                       const isSpotSelected =
                                         selection.explorerType === "spot" &&
-                                        selection.explorerProjectId === project.id &&
+                                        selection.explorerDeckId === deck.id &&
                                         selection.explorerSpotId === spot.id;
 
                                       return (
@@ -213,13 +218,13 @@ export default function MapLibraryHierarchy({
                                             />
                                           }
                                           selected={isSpotSelected}
-                                          onClick={() => onSelectSpot(domain.id, project.id, spot.id)}
+                                          onClick={() => onSelectSpot(domain.id, deck.id, spot.id)}
                                           onContextMenu={(event) =>
                                             onContextMenu(event, {
                                               type: "spot",
                                               id: spot.id,
                                               name: spot.name,
-                                              projectId: project.id,
+                                              deckId: deck.id,
                                               domainId: domain.id
                                             })
                                           }

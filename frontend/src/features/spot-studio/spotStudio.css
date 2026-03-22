@@ -124,6 +124,7 @@
   z-index: 2;
   display: grid;
   align-content: start;
+  overflow: hidden;
   padding: 6px 7px;
   border: 1px solid rgba(189, 196, 207, 0.28);
   background: rgba(195, 205, 217, 0.06);
@@ -141,10 +142,63 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+.map-zone.has-preview {
+  background: rgba(7, 9, 12, 0.88);
+}
+
+.map-zone-preview {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  opacity: 0.92;
+  filter: grayscale(0.04) brightness(0.9) contrast(1.02);
+  pointer-events: none;
+}
+
+.map-zone-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 10, 13, 0.08), rgba(8, 10, 13, 0.24));
+}
+
+.map-zone-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: calc(100% - 4px);
+  padding: 1px 5px;
+  border: 1px solid rgba(220, 225, 232, 0.18);
+  background: rgba(13, 15, 19, 0.68);
+  color: rgba(247, 244, 237, 0.92);
+  font-size: 0.62rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 .map-zone.is-selected,
 .map-hazard.is-selected,
 .map-pin.is-selected {
   box-shadow: inset 0 0 0 1px rgba(240, 235, 227, 0.36);
+}
+
+.map-zone.is-draggable,
+.map-hazard.is-draggable,
+.map-pin.is-draggable {
+  cursor: grab;
+}
+
+.map-zone.is-draggable:active,
+.map-hazard.is-draggable:active,
+.map-pin.is-draggable:active {
+  cursor: grabbing;
 }
 
 .map-hazard {
@@ -2179,16 +2233,16 @@
   color: var(--text-primary);
 }
 
-.map-selection-overlay {
+.map-selection-overlay-shell {
   position: absolute;
   left: 8px;
   bottom: 8px;
   z-index: 20;
   display: grid;
   gap: 6px;
+  width: min(64%, 360px);
   min-width: 220px;
-  max-width: min(64%, 360px);
-  padding: 10px 11px;
+  padding: 6px;
   border: 1px solid rgba(232, 228, 219, 0.12);
   border-radius: 1px;
   background: rgba(29, 31, 35, 0.84);
@@ -2196,6 +2250,122 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 10px 24px rgba(0, 0, 0, 0.22);
+  transition:
+    gap 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.map-selection-overlay-shell.is-group-overlay {
+  width: min(68%, 372px);
+  min-width: 244px;
+}
+
+.map-selection-overlay-shell.is-bulk-overlay {
+  width: min(72%, 404px);
+  min-width: 264px;
+}
+
+.map-selection-overlay-shell.is-collapsed {
+  gap: 0;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.16);
+}
+
+.map-selection-overlay-toggle {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(196, 204, 216, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.map-selection-overlay-toggle:hover {
+  border-color: rgba(214, 209, 199, 0.3);
+  background: rgba(214, 209, 199, 0.1);
+}
+
+.map-selection-overlay-toggle-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.map-selection-overlay-toggle-label {
+  color: var(--text-tertiary);
+  font-size: 0.55rem;
+  font-family: var(--font-en);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.map-selection-overlay-toggle strong {
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-selection-overlay-toggle small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-selection-overlay-toggle svg:last-child {
+  flex: 0 0 auto;
+  transition: transform 180ms ease;
+}
+
+.map-selection-overlay-shell.is-collapsed .map-selection-overlay-toggle svg:last-child {
+  transform: rotate(-90deg);
+}
+
+.map-selection-overlay-shell-body {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  max-height: 420px;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 200ms ease;
+}
+
+.map-selection-overlay-shell-body > * {
+  min-height: 0;
+}
+
+.map-selection-overlay-shell.is-collapsed .map-selection-overlay-shell-body {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+.map-selection-overlay {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  max-width: none;
+  padding: 4px 5px 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .map-selection-overlay-type {
@@ -2355,16 +2525,6 @@
 .map-selection-overlay .spot-toolbar-button.is-danger {
   border-color: rgba(214, 161, 156, 0.26);
   color: #e6cbc6;
-}
-
-.map-selection-overlay.is-group-overlay {
-  min-width: 244px;
-  max-width: min(68%, 372px);
-}
-
-.map-selection-overlay.is-bulk-overlay {
-  min-width: 264px;
-  max-width: min(72%, 404px);
 }
 
 .map-selection-compact-block {
@@ -2677,31 +2837,85 @@
 .desktop-studio-header {
   margin: 0;
   min-height: 0;
-  padding: 4px 8px;
+  padding: 2px 8px;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.desktop-studio-header > div:first-child {
+.desktop-studio-header-copy {
   display: grid;
   gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.desktop-studio-header-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.desktop-studio-header-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .desktop-studio-header .section-label {
-  margin: 0 0 1px;
-  font-size: 0.56rem;
+  margin: 0;
+  font-size: 0.5rem;
+  line-height: 1;
 }
 
 .desktop-studio-header h1 {
-  font-size: clamp(0.9rem, 1vw, 1.04rem);
-  line-height: 1.08;
+  overflow: hidden;
+  font-size: clamp(0.86rem, 0.95vw, 0.98rem);
+  line-height: 1.04;
   margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-studio-header .topbar-copy {
-  font-size: 0.69rem;
-  line-height: 1.18;
-  margin: 1px 0 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.61rem;
+  line-height: 1.05;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-studio-header .studio-header-status {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 16px;
+  padding: 0 5px;
+  margin: 0;
+  border: 1px solid rgba(156, 163, 173, 0.22);
+  color: var(--text-secondary);
+  font-size: 0.55rem;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.desktop-studio-header .studio-header-status.is-dirty {
+  border-color: rgba(226, 196, 140, 0.28);
+  color: rgba(239, 223, 192, 0.92);
+  background: rgba(159, 118, 55, 0.12);
+}
+
+.desktop-studio-header .studio-header-status.is-readonly {
+  border-color: rgba(160, 184, 208, 0.24);
+  color: rgba(208, 218, 228, 0.86);
+  background: rgba(84, 105, 129, 0.12);
 }
 
 .desktop-studio-header .session-card {
@@ -2767,10 +2981,10 @@
 }
 
 .studio-header-save-button {
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 24px;
+  padding: 0 9px;
   white-space: nowrap;
-  font-size: 0.76rem;
+  font-size: 0.67rem;
 }
 
 .desktop-studio-shell.is-spot-studio .studio-library-panel,
@@ -2861,6 +3075,627 @@
   border: 0;
   background: transparent;
   padding: 0;
+}
+
+.deck-studio-toolbarbar {
+  gap: 6px;
+}
+
+.deck-studio-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.deck-studio-primary-action {
+  min-height: 22px;
+}
+
+.deck-studio-title-meta {
+  color: var(--text-secondary);
+  font-size: 0.52rem;
+  line-height: 1.18;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.deck-studio-toolbar-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  color: var(--text-secondary);
+  font-size: 0.52rem;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.deck-studio-toolbar-meta span {
+  white-space: nowrap;
+}
+
+.deck-panel-title-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.deck-panel-title-copy h2 {
+  font-size: 0.84rem;
+  line-height: 1.08;
+}
+
+.deck-panel-title-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deck-sidebar-action {
+  min-height: 20px;
+  padding: 0 6px;
+  min-width: 42px;
+  font-size: 0.54rem;
+}
+
+.deck-studio-hierarchy-stack {
+  min-height: 0;
+}
+
+.deck-studio-sidebar-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  min-height: 0;
+}
+
+.deck-spot-hierarchy {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.deck-spot-hierarchy-panel {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.deck-hierarchy-root {
+  display: grid;
+  gap: 2px;
+  min-height: 18px;
+  padding: 4px 6px;
+  border: 1px solid var(--spot-panel-border);
+  background: var(--spot-panel-soft);
+}
+
+.deck-hierarchy-root strong {
+  font-size: 0.6rem;
+  line-height: 1.18;
+}
+
+.deck-hierarchy-root small {
+  color: var(--text-secondary);
+  font-size: 0.54rem;
+  line-height: 1.18;
+}
+
+.deck-spot-tree {
+  padding: 4px 0 6px;
+}
+
+.deck-spot-tree .unity-tree-line {
+  min-height: 20px;
+  padding-right: 4px;
+}
+
+.deck-spot-tree .unity-tree-item {
+  min-height: 20px;
+  padding: 0 4px 0 2px;
+}
+
+.deck-spot-tree .unity-tree-direction-badge {
+  min-height: 14px;
+  padding: 0 4px;
+  font-size: 0.5rem;
+}
+
+.deck-spot-tree-preview {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--spot-panel-border);
+  background: var(--spot-panel-softer);
+  flex: 0 0 auto;
+}
+
+.deck-spot-tree-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.12) brightness(0.86);
+}
+
+.deck-spot-tree-preview-fallback {
+  color: var(--spot-label-muted);
+  font-size: 0.42rem;
+  letter-spacing: 0.08em;
+}
+
+.deck-spot-card {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.deck-spot-card:hover {
+  border-color: rgba(214, 219, 225, 0.24);
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.deck-spot-card.is-active {
+  border-color: var(--line-strong);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.deck-spot-card:active {
+  cursor: grabbing;
+}
+
+.deck-spot-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.deck-spot-card-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deck-spot-card-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--spot-panel-border);
+  background:
+    linear-gradient(var(--spot-panel-softer), var(--spot-panel-softer)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: auto, 16px 16px, 16px 16px;
+}
+
+.deck-spot-card-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.12) brightness(0.86);
+}
+
+.deck-spot-card-preview.is-empty span {
+  color: var(--text-tertiary);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+}
+
+.deck-spot-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  align-content: center;
+}
+
+.deck-spot-card-copy small {
+  color: var(--text-secondary);
+  font-size: 0.54rem;
+  line-height: 1.3;
+}
+
+.deck-spot-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.deck-spot-card-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--spot-panel-border);
+  background: var(--spot-panel-softer);
+  color: var(--spot-label-muted);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.deck-spot-card-tag.is-accent {
+  border-color: var(--spot-accent-border);
+  background: var(--spot-accent-fill);
+  color: var(--text-primary);
+}
+
+.deck-spot-card-metrics {
+  color: var(--text-secondary);
+}
+
+.deck-spot-card-hint {
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.deck-studio-preview-panel {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.deck-canvas-drop-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  gap: 2px;
+  min-width: 176px;
+  max-width: 220px;
+  padding: 6px 8px;
+  border: 1px dashed var(--spot-floating-border);
+  background: var(--spot-floating-bg);
+  box-shadow: var(--spot-floating-shadow);
+  color: var(--text-primary);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.98);
+  transition: opacity 140ms ease, transform 180ms ease, border-color 180ms ease;
+  backdrop-filter: blur(var(--spot-floating-blur));
+}
+
+.deck-canvas-drop-hint strong {
+  font-size: 0.62rem;
+}
+
+.deck-canvas-drop-hint small {
+  color: var(--text-secondary);
+  font-size: 0.54rem;
+  line-height: 1.35;
+}
+
+.deck-canvas-drop-hint.is-active {
+  opacity: 1;
+  border-color: var(--spot-accent-border);
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.deck-studio-browser-panel {
+  align-content: stretch;
+  overflow: hidden;
+}
+
+.deck-studio-inspector-panel .unity-inspector-object-header {
+  display: grid;
+  gap: 2px;
+}
+
+.deck-inspector-selection-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.deck-inspector-selection-kind {
+  color: var(--text-secondary);
+  font-size: 0.56rem;
+  line-height: 1.25;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.deck-inspector-helper {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.54rem;
+  line-height: 1.35;
+}
+
+.desktop-studio-shell:not(.is-spot-studio) .studio-library-panel,
+.desktop-studio-shell:not(.is-spot-studio) .studio-browser-panel,
+.desktop-studio-shell:not(.is-spot-studio) .studio-inspector-panel {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-panel);
+}
+
+.desktop-studio-shell:not(.is-spot-studio) .studio-library-panel,
+.desktop-studio-shell:not(.is-spot-studio) .studio-inspector-panel {
+  overflow: auto;
+}
+
+.desktop-studio-shell:not(.is-spot-studio) .studio-browser-panel {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.desktop-studio-shell.is-deck-studio {
+  grid-template-columns: 252px minmax(0, 1fr) 292px;
+  gap: 6px;
+  padding: 6px 6px 3%;
+  --spot-panel-bg: var(--bg-panel);
+  --spot-panel-strong: var(--bg-panel-strong);
+  --spot-panel-soft: rgba(255, 255, 255, 0.028);
+  --spot-panel-softer: rgba(255, 255, 255, 0.016);
+  --spot-panel-border: var(--line-soft);
+  --spot-control-border: var(--line-default);
+  --spot-control-border-strong: rgba(238, 234, 226, 0.22);
+  --spot-control-bg: rgba(255, 255, 255, 0.04);
+  --spot-control-bg-hover: rgba(255, 255, 255, 0.06);
+  --spot-control-bg-active: rgba(214, 209, 199, 0.1);
+  --spot-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --spot-accent: var(--accent);
+  --spot-accent-border: rgba(214, 209, 199, 0.34);
+  --spot-accent-fill: rgba(214, 209, 199, 0.06);
+  --spot-accent-fill-strong: rgba(214, 209, 199, 0.11);
+  --spot-floating-border: rgba(232, 228, 219, 0.12);
+  --spot-floating-bg: rgba(29, 31, 35, 0.84);
+  --spot-floating-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  --spot-floating-blur: 12px;
+  --spot-label-muted: var(--text-secondary);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-library-panel,
+.desktop-studio-shell.is-deck-studio .studio-browser-panel,
+.desktop-studio-shell.is-deck-studio .studio-inspector-panel {
+  padding: 0;
+  border-color: var(--spot-panel-border);
+  background: var(--spot-panel-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-library-panel {
+  background: var(--spot-panel-strong);
+  overflow: hidden;
+}
+
+.desktop-studio-shell.is-deck-studio .studio-inspector-panel {
+  border: 0;
+}
+
+.desktop-studio-shell.is-deck-studio .studio-preview-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 6px;
+  background: var(--bg-surface);
+  border: 0;
+}
+
+.desktop-studio-shell.is-deck-studio .studio-browser-panel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
+}
+
+.desktop-studio-shell.is-deck-studio .map-canvas {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  max-width: 100%;
+  min-height: 0;
+  border-color: var(--spot-panel-border);
+  background: var(--bg-app);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-studio-panel-titlebar {
+  min-height: 26px;
+  padding: 0 8px;
+  border-bottom-color: var(--spot-panel-border);
+  background: var(--spot-panel-strong);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-studio-panel-toolbarbar {
+  min-height: 34px;
+  padding: 4px;
+  border-bottom-color: var(--spot-panel-border);
+  background: var(--spot-panel-soft);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-spot-inspector-body {
+  gap: 6px;
+  padding: 6px;
+  background: var(--spot-panel-bg);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-inspector-object-header {
+  padding: 2px 2px 4px;
+}
+
+.desktop-studio-shell.is-deck-studio .unity-inspector-object-header h2 {
+  font-size: 0.82rem;
+}
+
+.desktop-studio-shell.is-deck-studio .section-label,
+.desktop-studio-shell.is-deck-studio .studio-library-label,
+.desktop-studio-shell.is-deck-studio .unity-inspector-section-head,
+.desktop-studio-shell.is-deck-studio .deck-studio-title-meta,
+.desktop-studio-shell.is-deck-studio .deck-inspector-selection-kind {
+  color: var(--spot-label-muted);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-inspector-section,
+.desktop-studio-shell.is-deck-studio .selection-strip,
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-notice-panel,
+.desktop-studio-shell.is-deck-studio .inspector-origin-card,
+.desktop-studio-shell.is-deck-studio .detail-item {
+  border-color: var(--spot-panel-border);
+  background: var(--spot-panel-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-inspector-section-head {
+  border-bottom-color: var(--spot-panel-border);
+  background: var(--spot-panel-strong);
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-button,
+.desktop-studio-shell.is-deck-studio .spot-toolbar-select-shell,
+.desktop-studio-shell.is-deck-studio .inspector-input,
+.desktop-studio-shell.is-deck-studio .meta-pill {
+  border-color: var(--spot-control-border);
+  background: var(--spot-control-bg);
+  box-shadow: var(--spot-control-shadow);
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-button {
+  min-height: 28px;
+  min-width: 68px;
+  gap: 5px;
+  font-size: 0.78rem;
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-select-shell {
+  min-height: 28px;
+  padding: 0 6px;
+  gap: 5px;
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-actions {
+  gap: 8px;
+  padding: 0;
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-button:hover,
+.desktop-studio-shell.is-deck-studio .deck-sidebar-action:hover {
+  border-color: var(--spot-control-border-strong);
+  background: var(--spot-control-bg-hover);
+  color: var(--text-primary);
+}
+
+.desktop-studio-shell.is-deck-studio .inspector-input,
+.desktop-studio-shell.is-deck-studio select.inspector-input {
+  color: var(--text-primary);
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+}
+
+.desktop-studio-shell.is-deck-studio .spot-toolbar-select {
+  min-height: 24px;
+  min-width: 150px;
+  padding-left: 2px;
+  font-size: 0.78rem;
+}
+
+.desktop-studio-shell.is-deck-studio .unity-hierarchy-window,
+.desktop-studio-shell.is-deck-studio .unity-spot-inspector-body {
+  background: var(--spot-panel-bg);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-panel,
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-notice-panel,
+.desktop-studio-shell.is-deck-studio .unity-inspector-section,
+.desktop-studio-shell.is-deck-studio .inspector-origin-card {
+  border-color: var(--spot-panel-border);
+  background: var(--spot-panel-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-panel {
+  background: var(--spot-panel-strong);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-hierarchy-scroll {
+  background: var(--spot-panel-bg);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-browser-panel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-notice-head strong {
+  font-size: 0.56rem;
+}
+
+.desktop-studio-shell.is-deck-studio .studio-hierarchy-notice-text {
+  font-size: 0.52rem;
+  line-height: 1.18;
+}
+
+.desktop-studio-shell.is-deck-studio .unity-tree-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-tree-item.is-active {
+  background: rgba(236, 231, 221, 0.1);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.desktop-studio-shell.is-deck-studio .unity-tree-direction-badge {
+  border-color: var(--spot-control-border);
+  background: var(--spot-control-bg);
+  color: var(--spot-label-muted);
+  box-shadow: var(--spot-control-shadow);
+}
+
+.desktop-studio-shell.is-deck-studio .studio-breadcrumbs span {
+  padding: 2px 6px;
+  border-color: var(--spot-control-border);
+  background: var(--spot-control-bg);
+  color: var(--spot-label-muted);
+  font-size: 0.62rem;
+  box-shadow: var(--spot-control-shadow);
+}
+
+.desktop-studio-shell.is-deck-studio .detail-grid {
+  gap: 6px;
+}
+
+.desktop-studio-shell.is-deck-studio .detail-item {
+  padding: 7px 8px;
+}
+
+.desktop-studio-shell.is-deck-studio .detail-item span {
+  font-size: 0.64rem;
+}
+
+.desktop-studio-shell.is-deck-studio .detail-item strong {
+  margin-top: 4px;
+  font-size: 0.8rem;
 }
 
 .unity-studio-panel-titlebar .studio-breadcrumbs {
@@ -2989,6 +3824,17 @@
   border: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.012);
   text-align: left;
+}
+
+.studio-asset-item small {
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.studio-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .compact-empty {
@@ -3295,6 +4141,7 @@
 .desktop-studio-shell.is-spot-studio .map-selection-badges span,
 .desktop-studio-shell.is-spot-studio .map-selection-area-corners,
 .desktop-studio-shell.is-spot-studio .map-overlay-toolbox-toggle,
+.desktop-studio-shell.is-spot-studio .map-selection-overlay-toggle,
 .desktop-studio-shell.is-spot-studio .map-selection-overlay .spot-toolbar-button {
   border-color: var(--spot-control-border);
   background: var(--spot-control-bg);
@@ -3315,7 +4162,8 @@
 .desktop-studio-shell.is-spot-studio .spot-toolbar-button:hover,
 .desktop-studio-shell.is-spot-studio .map-selection-overlay .spot-toolbar-button:hover,
 .desktop-studio-shell.is-spot-studio .unity-hierarchy-filter-pill:hover,
-.desktop-studio-shell.is-spot-studio .map-overlay-toolbox-toggle:hover {
+.desktop-studio-shell.is-spot-studio .map-overlay-toolbox-toggle:hover,
+.desktop-studio-shell.is-spot-studio .map-selection-overlay-toggle:hover {
   border-color: var(--spot-control-border-strong);
   background: var(--spot-control-bg-hover);
   color: var(--text-primary);
@@ -3366,13 +4214,18 @@
 
 .desktop-studio-shell.is-spot-studio .map-mode-indicator,
 .desktop-studio-shell.is-spot-studio .map-overlay-toolbox,
-.desktop-studio-shell.is-spot-studio .map-selection-overlay {
+.desktop-studio-shell.is-spot-studio .map-selection-overlay-shell {
   border-color: var(--spot-floating-border);
   background: var(--spot-floating-bg);
   backdrop-filter: blur(var(--spot-floating-blur)) saturate(130%);
   box-shadow:
     var(--spot-floating-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.desktop-studio-shell.is-spot-studio .map-selection-overlay,
+.desktop-studio-shell.is-spot-studio .map-selection-overlay-toggle {
+  background: transparent;
 }
 
 .desktop-studio-shell.is-spot-studio .map-mode-indicator.is-origin {

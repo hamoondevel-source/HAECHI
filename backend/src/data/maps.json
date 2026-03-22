@@ -213,8 +213,8 @@
     "id": "domain-seoul-factory",
     "name": "테스트 DOMAIN",
     "status": "draft",
-    "version": "draft-2026-03-20T15:36:59.216Z",
-    "updatedAt": "2026-03-20T15:36:59.215Z",
+    "version": "draft-2026-03-22T03:04:37.566Z",
+    "updatedAt": "2026-03-22T03:04:37.566Z",
     "activeDeckId": "deck-2f",
     "decks": [
       {
@@ -223,10 +223,12 @@
         "name": "테스트 DECK",
         "elevation": 4.8,
         "image": {
-          "name": "logo",
-          "src": "/map-assets/deck-2f-logo.png",
-          "width": 1600,
-          "height": 900
+          "name": "MAP",
+          "src": "/map-assets/deck-2f-deck-1774148677564-map.jpg",
+          "width": 570,
+          "height": 380,
+          "fileName": "MAP.jpg",
+          "serverSrc": "/map-assets/deck-2f-deck-1774148677564-map.jpg"
         },
         "calibration": {
           "origin": {
@@ -249,6 +251,57 @@
             "height": 160,
             "calibration": {
               "origin": {
+                "x": 317,
+                "y": 188
+              },
+              "resolution": 0.22,
+              "rotation": 48,
+              "gridMeters": 1,
+              "gridColor": "#006aff",
+              "gridOpacity": 1,
+              "gridCount": 20
+            },
+            "image": {
+              "name": "MAP",
+              "fileName": "MAP.jpg",
+              "width": 570,
+              "height": 380,
+              "src": "/map-assets/deck-2f-spot-spot-mmvjqvb3-utmx-1774097366479-map.jpg",
+              "serverSrc": "/map-assets/deck-2f-spot-spot-mmvjqvb3-utmx-1774097366479-map.jpg"
+            },
+            "editor": {
+              "waypointGroups": [],
+              "waypoints": [
+                {
+                  "id": "wp-mn0esslp-2l2k",
+                  "name": "WP-1",
+                  "x": 209,
+                  "y": 159,
+                  "groupId": null
+                },
+                {
+                  "id": "wp-mn0estv5-dmcb",
+                  "name": "WP-2",
+                  "x": 276,
+                  "y": 181,
+                  "groupId": null
+                }
+              ],
+              "zones": [],
+              "edges": []
+            }
+          },
+          {
+            "id": "spot-mmwq7np9-r27y",
+            "name": "New Spot 2",
+            "kind": "spot",
+            "zoneKey": "Spot 2",
+            "x": 283,
+            "y": 220,
+            "width": 240,
+            "height": 160,
+            "calibration": {
+              "origin": {
                 "x": 240,
                 "y": 660
               },
@@ -258,15 +311,23 @@
               "gridColor": "#8a929d",
               "gridOpacity": 0.26,
               "gridCount": 20
+            },
+            "image": {
+              "name": "MAP",
+              "fileName": "MAP.jpg",
+              "width": 570,
+              "height": 380,
+              "src": "/map-assets/deck-2f-spot-spot-mmwq7np9-r27y-1774102542646-map.jpg",
+              "serverSrc": "/map-assets/deck-2f-spot-spot-mmwq7np9-r27y-1774102542646-map.jpg"
             }
           },
           {
-            "id": "spot-mmwq7np9-r27y",
-            "name": "New Spot 2",
+            "id": "spot-mmynxlp3-mq66",
+            "name": "New Spot 3",
             "kind": "spot",
-            "zoneKey": "Spot 2",
-            "x": 208,
-            "y": 196,
+            "zoneKey": "Spot 3",
+            "x": 563,
+            "y": 1079,
             "width": 240,
             "height": 160,
             "calibration": {
@@ -283,12 +344,34 @@
             }
           },
           {
-            "id": "spot-mmynxlp3-mq66",
-            "name": "New Spot 3",
+            "id": "spot-mn0hkri4-3lz0",
+            "name": "New Spot 4",
             "kind": "spot",
-            "zoneKey": "Spot 3",
-            "x": 232,
-            "y": 214,
+            "zoneKey": "Spot 4",
+            "x": 277,
+            "y": 830,
+            "width": 240,
+            "height": 160,
+            "calibration": {
+              "origin": {
+                "x": 240,
+                "y": 660
+              },
+              "resolution": 0.05,
+              "rotation": 0,
+              "gridMeters": 1,
+              "gridColor": "#8a929d",
+              "gridOpacity": 0.26,
+              "gridCount": 20
+            }
+          },
+          {
+            "id": "spot-mn0hmtc3-ku6b",
+            "name": "New Spot 5",
+            "kind": "spot",
+            "zoneKey": "Spot 5",
+            "x": 731,
+            "y": 854,
             "width": 240,
             "height": 160,
             "calibration": {
@@ -305,7 +388,32 @@
             }
           }
         ],
-        "noGoZones": [],
+        "noGoZones": [
+          {
+            "id": "nogo-mn0hmsgn-s4zv",
+            "name": "Restricted 1",
+            "x": 457,
+            "y": 242,
+            "width": 160,
+            "height": 120
+          },
+          {
+            "id": "nogo-mn0hmsm2-dk83",
+            "name": "Restricted 2",
+            "x": 513,
+            "y": 411,
+            "width": 160,
+            "height": 120
+          },
+          {
+            "id": "nogo-mn14a3lp-2zl9",
+            "name": "Restricted 3",
+            "x": 84,
+            "y": 447,
+            "width": 160,
+            "height": 120
+          }
+        ],
         "docks": [],
         "portals": [
           {
@@ -314,6 +422,30 @@
             "kind": "vertical",
             "x": 1360,
             "y": 648,
+            "targetDeckId": null
+          },
+          {
+            "id": "portal-mn0hl9r6-qtqh",
+            "name": "Portal 2",
+            "kind": "vertical",
+            "x": 760,
+            "y": 636,
+            "targetDeckId": null
+          },
+          {
+            "id": "portal-mn0hlbut-w7jr",
+            "name": "Portal 3",
+            "kind": "vertical",
+            "x": 760,
+            "y": 644,
+            "targetDeckId": null
+          },
+          {
+            "id": "portal-mn0hmrwk-dt26",
+            "name": "Portal 4",
+            "kind": "vertical",
+            "x": 760,
+            "y": 652,
             "targetDeckId": null
           }
         ]

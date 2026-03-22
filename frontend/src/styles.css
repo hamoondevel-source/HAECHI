@@ -181,75 +181,37 @@ button {
   background: rgba(167, 64, 64, 0.66);
 }
 
-.window-close-modal {
-  width: min(100%, 420px);
-}
-
-.window-close-modal .app-modal-head {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.window-close-modal .app-modal-head h2 {
-  word-break: keep-all;
-  line-break: strict;
-  white-space: normal;
-}
-
-.window-close-modal .app-modal-copy {
-  word-break: keep-all;
-  line-break: strict;
-}
-
-@media (max-width: 520px) {
-  .window-close-modal {
-    width: min(100%, 340px);
-    gap: 14px;
-    padding: 16px;
-  }
-
-  .window-close-modal .app-modal-actions {
-    gap: 8px;
-  }
-
-  .window-close-modal .app-modal-actions .ghost-button,
-  .window-close-modal .app-modal-actions .primary-button {
-    min-width: 92px;
-    min-height: 40px;
-  }
-}
-
 .app-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 120;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: 14px;
   background: rgba(10, 10, 12, 0.58);
 }
 
 .app-modal {
-  width: min(100%, 440px);
+  width: min(100%, 388px);
   display: grid;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 16px 16px 15px;
   border: 1px solid rgba(185, 192, 201, 0.2);
   background: rgba(26, 27, 29, 0.985);
-  box-shadow: 0 26px 72px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
 }
 
 .app-modal-head {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
 }
 
 .app-modal-icon-shell {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(183, 192, 204, 0.18);
@@ -264,32 +226,45 @@ button {
 }
 
 .app-modal-icon-shell svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
+}
+
+.app-modal-head-copy {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 34px;
+}
+
+.app-modal-head .section-label {
+  margin: 0;
+  font-size: 0.54rem;
+  line-height: 1;
 }
 
 .app-modal-head h2 {
   margin: 0;
-  font-size: 1.24rem;
-  line-height: 1.24;
+  font-size: 1rem;
+  line-height: 1.08;
 }
 
 .app-modal-copy {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.76rem;
+  line-height: 1.42;
 }
 
 .app-modal-form-field {
   display: grid;
-  gap: 9px;
+  gap: 6px;
 }
 
 .app-modal-field-label {
   display: block;
   color: rgba(216, 221, 228, 0.74);
-  font-size: 0.76rem;
+  font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.2;
@@ -298,11 +273,12 @@ button {
 
 .app-modal-field-input {
   width: 100%;
-  min-height: 46px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 11px;
   border: 1px solid rgba(186, 193, 202, 0.22);
   background: rgba(59, 60, 63, 0.88);
   color: var(--text-primary);
+  font-size: 0.82rem;
   outline: none;
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
@@ -320,14 +296,16 @@ button {
 .app-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 2px;
+  gap: 8px;
+  margin-top: 0;
 }
 
 .app-modal-actions .ghost-button,
 .app-modal-actions .primary-button {
-  min-width: 116px;
-  min-height: 44px;
+  min-width: 92px;
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.74rem;
 }
 
 .screen-dashboard {

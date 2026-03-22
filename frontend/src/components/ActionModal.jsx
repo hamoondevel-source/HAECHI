@@ -44,7 +44,7 @@ export default function ActionModal({ modal, onClose }) {
           <div className={`app-modal-icon-shell ${modal.tone === "danger" ? "is-danger" : ""}`}>
             <ModalIcon aria-hidden="true" />
           </div>
-          <div>
+          <div className="app-modal-head-copy">
             <p className="section-label" lang="en">
               {modal.caption ?? "Action"}
             </p>

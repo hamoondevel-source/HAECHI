@@ -5,6 +5,7 @@ export default function TreeRow({
   label,
   meta = null,
   icon = null,
+  title,
   selected = false,
   descendantFocused = false,
   collapsible = false,
@@ -13,6 +14,9 @@ export default function TreeRow({
   onClick,
   onDoubleClick,
   onContextMenu,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
   isMuted = false,
   editing = false,
   editorValue = "",
@@ -97,9 +101,13 @@ export default function TreeRow({
         <button
           type="button"
           className={itemClassName}
+          title={title}
+          draggable={draggable}
           onClick={onClick}
           onDoubleClick={onDoubleClick}
           onContextMenu={onContextMenu}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
         >
           {icon}
           <span className="unity-tree-label">{label}</span>
