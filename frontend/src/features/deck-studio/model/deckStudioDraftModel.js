@@ -62,9 +62,12 @@ function resolveSpotResolution(spot, fallbackResolution) {
 }
 
 function resolveSpotSourceSize(spot) {
+  const baseWidth = Number(spot?.placementBaseWidth ?? spot?.width ?? spot?.image?.width ?? 240);
+  const baseHeight = Number(spot?.placementBaseHeight ?? spot?.height ?? spot?.image?.height ?? 160);
+
   return {
-    width: Math.max(32, Number(spot?.image?.width ?? spot?.width ?? 240)),
-    height: Math.max(32, Number(spot?.image?.height ?? spot?.height ?? 160))
+    width: Math.max(32, baseWidth),
+    height: Math.max(32, baseHeight)
   };
 }
 
@@ -80,21 +83,35 @@ export function resolveDeckStudioSpotPlacementSize(deckDraft, spot) {
   };
 }
 
-function normalizeDeckStudioSpotPlacement(deckDraft, spot) {
+function resolveDeckStudioSpotPlacementBounds(deckDraft, spotWidth, spotHeight) {
   const deckImageWidth = Number(deckDraft?.image?.width ?? 1600);
   const deckImageHeight = Number(deckDraft?.image?.height ?? 900);
+
+  return {
+    minX: -Math.max(0, Number(spotWidth ?? 0)),
+    minY: -Math.max(0, Number(spotHeight ?? 0)),
+    maxX: deckImageWidth,
+    maxY: deckImageHeight
+  };
+}
+
+function normalizeDeckStudioSpotPlacement(deckDraft, spot) {
+  const sourceSize = resolveSpotSourceSize(spot);
   const nextSize = resolveDeckStudioSpotPlacementSize(deckDraft, spot);
   const rawX = Number(spot?.x ?? 0);
   const rawY = Number(spot?.y ?? 0);
   const nextIsPlaced = spot?.isPlaced === true;
+  const placementBounds = resolveDeckStudioSpotPlacementBounds(deckDraft, nextSize.width, nextSize.height);
 
   return {
     ...spot,
+    placementBaseWidth: sourceSize.width,
+    placementBaseHeight: sourceSize.height,
     isPlaced: nextIsPlaced,
     width: nextSize.width,
     height: nextSize.height,
-    x: Math.round(clamp(rawX, 0, Math.max(0, deckImageWidth - nextSize.width))),
-    y: Math.round(clamp(rawY, 0, Math.max(0, deckImageHeight - nextSize.height)))
+    x: Math.round(clamp(rawX, placementBounds.minX, placementBounds.maxX)),
+    y: Math.round(clamp(rawY, placementBounds.minY, placementBounds.maxY))
   };
 }
 
@@ -108,6 +125,8 @@ export function prepareDeckStudioDraft(deckDraft) {
     const normalizedSpot = normalizeDeckStudioSpotPlacement(deckDraft, spot);
 
     if (
+      normalizedSpot.placementBaseWidth !== spot.placementBaseWidth ||
+      normalizedSpot.placementBaseHeight !== spot.placementBaseHeight ||
       normalizedSpot.isPlaced !== spot.isPlaced ||
       normalizedSpot.width !== spot.width ||
       normalizedSpot.height !== spot.height ||
@@ -137,15 +156,14 @@ export function resolveDeckStudioSpotAssignmentPatch(deckDraft, spotId, point = 
     return null;
   }
 
-  const imageWidth = Number(deckDraft?.image?.width ?? 1600);
-  const imageHeight = Number(deckDraft?.image?.height ?? 900);
   const nextSize = resolveDeckStudioSpotPlacementSize(deckDraft, targetSpot);
+  const placementBounds = resolveDeckStudioSpotPlacementBounds(deckDraft, nextSize.width, nextSize.height);
   const fallbackX = Number.isFinite(Number(targetSpot.x))
     ? Number(targetSpot.x)
-    : Math.max(0, (imageWidth - nextSize.width) / 2);
+    : Math.max(0, ((Number(deckDraft?.image?.width ?? 1600)) - nextSize.width) / 2);
   const fallbackY = Number.isFinite(Number(targetSpot.y))
     ? Number(targetSpot.y)
-    : Math.max(0, (imageHeight - nextSize.height) / 2);
+    : Math.max(0, ((Number(deckDraft?.image?.height ?? 900)) - nextSize.height) / 2);
   const rawX = point ? Number(point.x ?? fallbackX) - nextSize.width / 2 : fallbackX;
   const rawY = point ? Number(point.y ?? fallbackY) - nextSize.height / 2 : fallbackY;
 
@@ -153,8 +171,8 @@ export function resolveDeckStudioSpotAssignmentPatch(deckDraft, spotId, point = 
     isPlaced: true,
     width: nextSize.width,
     height: nextSize.height,
-    x: Math.round(clamp(rawX, 0, Math.max(0, imageWidth - nextSize.width))),
-    y: Math.round(clamp(rawY, 0, Math.max(0, imageHeight - nextSize.height)))
+    x: Math.round(clamp(rawX, placementBounds.minX, placementBounds.maxX)),
+    y: Math.round(clamp(rawY, placementBounds.minY, placementBounds.maxY))
   };
 }
 

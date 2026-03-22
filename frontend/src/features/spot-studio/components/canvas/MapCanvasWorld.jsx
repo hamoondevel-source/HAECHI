@@ -7,12 +7,16 @@ function clamp(value, min, max) {
 }
 
 function clampDeckRectPosition(item, imageWidth, imageHeight, nextX, nextY) {
-  const maxX = Math.max(0, imageWidth - Number(item?.width ?? 0));
-  const maxY = Math.max(0, imageHeight - Number(item?.height ?? 0));
+  const itemWidth = Math.max(0, Number(item?.width ?? 0));
+  const itemHeight = Math.max(0, Number(item?.height ?? 0));
+  const minX = -itemWidth;
+  const minY = -itemHeight;
+  const maxX = Number(imageWidth ?? 0);
+  const maxY = Number(imageHeight ?? 0);
 
   return {
-    x: Math.round(clamp(nextX, 0, maxX)),
-    y: Math.round(clamp(nextY, 0, maxY))
+    x: Math.round(clamp(nextX, minX, maxX)),
+    y: Math.round(clamp(nextY, minY, maxY))
   };
 }
 
